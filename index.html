@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sudbury Blended Forecast</title>
+<title>Blended Forecast</title>
 <meta name="theme-color" content="#f6f7f9">
-<meta name="apple-mobile-web-app-title" content="Sudbury Wx">
+<meta name="apple-mobile-web-app-title" content="Wx Blend">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -87,6 +87,19 @@ nav.tabs button[aria-selected="true"]{background:var(--card);color:var(--ink);bo
 /* detail */
 .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:1000;display:flex;justify-content:center;align-items:flex-end}
 .sheet-bg[hidden]{display:none}
+.placebtn{border:0;background:transparent;padding:0;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px}
+.placebtn .chev{font-size:14px;color:var(--ink-3);font-weight:500;border:1px solid var(--line);border-radius:999px;padding:2px 8px;background:var(--card)}
+.loc-search{width:100%;font:inherit;font-size:16px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);margin:14px 0 10px}
+.loc-search:focus{outline:2px solid var(--accent);outline-offset:1px}
+.loc-item{display:flex;width:100%;text-align:left;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border:0;border-bottom:1px solid var(--line-soft);background:transparent;cursor:pointer}
+.loc-item:last-child{border-bottom:0}
+.loc-item:hover{background:var(--line-soft)}
+.loc-item .ln{font-weight:600}
+.loc-item .ls{font-size:12.5px;color:var(--ink-3)}
+.loc-item .x{color:var(--ink-3);font-size:13px;padding:4px 6px}
+.geo-btn{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-weight:600;cursor:pointer;margin-bottom:6px;text-align:left}
+.sharebox{display:flex;gap:8px;align-items:center;padding:10px 12px;margin-top:14px}
+.sharebox input{flex:1;min-width:0;font:inherit;font-size:12.5px;border:0;background:transparent;color:var(--ink-2)}
 .sheet{background:var(--bg);width:100%;max-width:780px;max-height:94vh;overflow-y:auto;border-radius:18px 18px 0 0;padding:0 14px 40px;-webkit-overflow-scrolling:touch}
 @media (min-width:820px){.sheet-bg{align-items:center}.sheet{border-radius:18px;max-height:90vh}}
 .sheet-head{position:sticky;top:0;background:var(--bg);z-index:2;display:flex;align-items:center;gap:8px;padding:12px 0 10px;border-bottom:1px solid var(--line)}
@@ -148,7 +161,7 @@ footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
 <div class="wrap">
   <header class="top">
     <div>
-      <div class="place">Sudbury, MA</div>
+      <button class="placebtn" id="placeBtn" aria-label="Change location"><span class="place" id="placeName">Sudbury, MA</span><span class="chev">Change ▾</span></button>
       <div class="sub" id="updated">Loading forecasts…</div>
     </div>
     <button class="refresh" id="refreshBtn" aria-label="Refresh forecasts">↻ Refresh</button>
@@ -177,7 +190,7 @@ footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
     </div>
     <div class="radar-scale" id="radarScale"></div>
     <div class="radar-scale-l"><span>Light</span><span>Moderate</span><span>Heavy</span><span>Extreme</span></div>
-    <div class="legend-note">NEXRAD base reflectivity mosaic, last 50 minutes in 5-minute steps (Iowa Environmental Mesonet). For velocity and other products, open the <a href="https://radar.weather.gov/station/kbox/standard" target="_blank" rel="noopener">NWS Boston radar (KBOX)</a>.</div>
+    <div class="legend-note">NEXRAD base reflectivity mosaic, last 50 minutes in 5-minute steps (Iowa Environmental Mesonet). <span id="radarLink"></span> US only.</div>
   </section>
 
   <section class="view" id="view-sources" hidden>
@@ -207,12 +220,24 @@ footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
   </div>
 </div>
 
+<div class="sheet-bg" id="locBg" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="locTitle">
+    <div class="sheet-head"><h2 id="locTitle">Choose location</h2><button class="iconbtn" id="closeLoc" aria-label="Close">✕</button></div>
+    <input class="loc-search" id="locInput" type="search" placeholder="Town, city or ZIP code" autocomplete="off" enterkeyhint="search" aria-label="Search for a location">
+    <button class="geo-btn" id="geoBtn">📍 Use my current location</button>
+    <div id="locResults"></div>
+    <div class="card sharebox"><input id="shareUrl" readonly aria-label="Link to this location's forecast"><button class="refresh" id="copyLink">Copy link</button></div>
+    <div class="legend-note">Share this link to send someone the forecast for this location. Coverage: NWS and radar are US-only. Model forecasts work worldwide.</div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 "use strict";
 /* ---------- config ---------- */
-const LAT = 42.3834, LON = -71.4162, TZ = "America/New_York";
+const DEFAULT_LOC = {name:"Sudbury, MA", lat:42.3834, lon:-71.4162, tz:"America/New_York"};
+let LAT, LON, TZ, PLACE;
 const DAYS = 10;
 const MODELS = [
   {id:"gfs_seamless",   name:"GFS / HRRR",   org:"NOAA (US)",            desc:"US global model, blended with the high-resolution HRRR for the first ~2 days."},
@@ -230,7 +255,8 @@ const TYPE_LABEL = {rain:"Rain", snow:"Snow", mix:"Rain/snow mix", ice:"Freezing
 const TYPE_ICON  = {rain:"🌧️", snow:"🌨️", mix:"🌨️", ice:"🧊", sleet:"🌨️", thunder:"⛈️"};
 
 /* ---------- time helpers ---------- */
-const keyFmt = new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",hourCycle:"h23"});
+let keyFmt;
+function makeKeyFmt(){ keyFmt = new Intl.DateTimeFormat("en-CA",{timeZone:TZ,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",hourCycle:"h23"}); }
 function localKey(d){
   const p = Object.fromEntries(keyFmt.formatToParts(d).map(x=>[x.type,x.value]));
   return `${p.year}-${p.month}-${p.day}T${p.hour}`;
@@ -373,7 +399,9 @@ function parseNWSGrid(grid){
 /* ---------- state ---------- */
 let STATE=null, charts=[], openIdx=null;
 
+let loadSeq=0;
 async function loadAll(){
+  const mySeq=++loadSeq;
   document.getElementById("updated").textContent="Loading forecasts…";
   const status=[];
   const today=localKey(new Date()).slice(0,10);
@@ -389,6 +417,10 @@ async function loadAll(){
   const nwsP = (async()=>{
     const pt=await getJSON(`https://api.weather.gov/points/${LAT},${LON}`);
     const pr=pt.properties;
+    const rl=pr.relativeLocation&&pr.relativeLocation.properties;
+    if(PLACE.fromGeo && rl){ PLACE.name=`${rl.city}, ${rl.state}`; PLACE.fromGeo=false; saveLoc(); showPlace(); }
+    const rs=(pr.radarStation||"").toLowerCase();
+    document.getElementById("radarLink").innerHTML = rs ? `For velocity and other products, open the <a href="https://radar.weather.gov/station/${rs}/standard" target="_blank" rel="noopener">NWS radar (${rs.toUpperCase()})</a>.` : "";
     const [grid,fc]=await Promise.all([getJSON(pr.forecastGridData), getJSON(pr.forecast).catch(()=>null)]);
     return {id:"nws",name:"NWS",org:`NWS ${pr.gridId||"Boston"}`,kind:"nws",desc:"The official NWS forecast grid for this point. It runs about 7 days and is hand-edited by local forecasters.",hourly:parseNWSGrid(grid),periods:fc?fc.properties.periods:[]};
   })();
@@ -404,6 +436,7 @@ async function loadAll(){
   const ensembles=[];
   ens.forEach((r,i)=>{ if(r.status==="fulfilled") ensembles.push(r.value); status.push({name:ENSEMBLES[i].name,org:"via Open-Meteo",desc:ENSEMBLES[i].desc,ok:r.status==="fulfilled",err:r.reason&&r.reason.message}); });
 
+  if(mySeq!==loadSeq) return; // a newer location/refresh superseded this load
   STATE = blend(days,sources,ensembles);
   STATE.status=status; STATE.alerts=alerts; STATE.nws=nws.ok?nws.v:null; STATE.fetched=new Date();
   render();
@@ -744,7 +777,7 @@ function drawCharts(d){
 }
 
 /* ---------- radar ---------- */
-let map=null, radarLayers=[], frame=10, playing=true, timer=null;
+let marker=null, map=null, radarLayers=[], frame=10, playing=true, timer=null;
 const OFFSETS=[50,45,40,35,30,25,20,15,10,5,0];
 function initRadar(){
   if(map){ map.invalidateSize(); return; }
@@ -761,7 +794,7 @@ function initRadar(){
     radarLayers.push(L.tileLayer(`https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/${layer}/{z}/{x}/{y}.png?_=${Math.floor(Date.now()/300000)}`,{opacity:0,maxZoom:12,attribution:i===0?"Radar: IEM NEXRAD":""}).addTo(map));
   });
   L.tileLayer(esri(dark?"World_Dark_Gray_Reference":"World_Light_Gray_Reference"),{maxZoom:12,pane:"labels"}).addTo(map);
-  L.circleMarker([LAT,LON],{radius:6,color:"#fff",weight:2,fillColor:cssv("--accent"),fillOpacity:1}).addTo(map).bindTooltip("Sudbury");
+  const placeMarker=L.circleMarker([LAT,LON],{radius:6,color:"#fff",weight:2,fillColor:cssv("--accent"),fillOpacity:1}).addTo(map); marker=placeMarker; showPlace();
   showFrame(10); play();
 }
 function showFrame(i){
@@ -794,7 +827,111 @@ document.getElementById("nextDay").onclick=()=>openDay(openIdx+1);
 document.addEventListener("keydown",e=>{ if(openIdx===null) return; if(e.key==="Escape") closeSheet(); if(e.key==="ArrowLeft"&&openIdx>0) openDay(openIdx-1); if(e.key==="ArrowRight") document.getElementById("nextDay").disabled||openDay(openIdx+1); });
 document.getElementById("refreshBtn").onclick=()=>{ if(map) radarLayers.forEach(l=>l.redraw&&l.setUrl(l._url.replace(/_=\d+/,"_="+Date.now()))); loadAll().catch(fail); };
 function fail(e){ console.error(e); document.getElementById("updated").textContent="Couldn't load forecasts. Tap Refresh to retry."; document.getElementById("days").innerHTML=`<div class="loading">Forecast sources didn't respond (${esc(e.message||e)}).</div>`; }
-loadAll().catch(fail);
+/* ---------- location ---------- */
+const STATES={Alabama:"AL",Alaska:"AK",Arizona:"AZ",Arkansas:"AR",California:"CA",Colorado:"CO",Connecticut:"CT",Delaware:"DE","District of Columbia":"DC",Florida:"FL",Georgia:"GA",Hawaii:"HI",Idaho:"ID",Illinois:"IL",Indiana:"IN",Iowa:"IA",Kansas:"KS",Kentucky:"KY",Louisiana:"LA",Maine:"ME",Maryland:"MD",Massachusetts:"MA",Michigan:"MI",Minnesota:"MN",Mississippi:"MS",Missouri:"MO",Montana:"MT",Nebraska:"NE",Nevada:"NV","New Hampshire":"NH","New Jersey":"NJ","New Mexico":"NM","New York":"NY","North Carolina":"NC","North Dakota":"ND",Ohio:"OH",Oklahoma:"OK",Oregon:"OR",Pennsylvania:"PA","Rhode Island":"RI","South Carolina":"SC","South Dakota":"SD",Tennessee:"TN",Texas:"TX",Utah:"UT",Vermont:"VT",Virginia:"VA",Washington:"WA","West Virginia":"WV",Wisconsin:"WI",Wyoming:"WY","Puerto Rico":"PR"};
+function placeLabel(r){
+  if(r.country_code==="US") return `${r.name}, ${STATES[r.admin1]||r.admin1||"US"}`;
+  return [r.name, r.admin1, r.country].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).slice(0,2).join(", ")+(r.country&&r.admin1?`, ${r.country_code}`:"");
+}
+function store(k,v){ try{ v===undefined? localStorage.getItem(k) : localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+function load(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
+function shareLink(){ const u=new URL(location.href.split("?")[0].split("#")[0]); u.searchParams.set("lat",LAT.toFixed(4)); u.searchParams.set("lon",LON.toFixed(4)); u.searchParams.set("name",PLACE.name); u.searchParams.set("tz",TZ); return u.toString(); }
+function saveLoc(){
+  store("wxLoc",PLACE);
+  const rec=(load("wxRecent")||[]).filter(r=>Math.abs(r.lat-PLACE.lat)>0.01||Math.abs(r.lon-PLACE.lon)>0.01);
+  rec.unshift({name:PLACE.name,lat:PLACE.lat,lon:PLACE.lon,tz:PLACE.tz}); store("wxRecent",rec.slice(0,6));
+  try{ history.replaceState(null,"",shareLink()); }catch(e){}
+}
+function showPlace(){
+  document.getElementById("placeName").textContent=PLACE.name;
+  document.title=`${PLACE.name} · Blended Forecast`;
+  if(marker) marker.bindTooltip(PLACE.name.split(",")[0]);
+}
+function setLocation(loc, persist=true){
+  PLACE={...loc}; LAT=+loc.lat; LON=+loc.lon;
+  try{ new Intl.DateTimeFormat("en-US",{timeZone:loc.tz}); TZ=loc.tz; }catch(e){ TZ=Intl.DateTimeFormat().resolvedOptions().timeZone; }
+  PLACE.tz=TZ; makeKeyFmt(); showPlace();
+  if(persist) saveLoc();
+  if(map){ map.setView([LAT,LON],8); marker.setLatLng([LAT,LON]); }
+  if(openIdx!==null) closeSheet();
+  document.getElementById("days").innerHTML='<div class="loading"><span class="spin"></span>Pulling forecasts…</div>';
+  document.getElementById("nowCard").innerHTML=""; document.getElementById("alerts").innerHTML="";
+  STATE=null;
+  loadAll().catch(fail);
+}
+function initialLoc(){
+  const q=new URLSearchParams(location.search);
+  if(q.get("lat")&&q.get("lon")&&isFinite(+q.get("lat"))&&isFinite(+q.get("lon")))
+    return {name:q.get("name")||"Selected location",lat:+q.get("lat"),lon:+q.get("lon"),tz:q.get("tz")||Intl.DateTimeFormat().resolvedOptions().timeZone};
+  return load("wxLoc")||DEFAULT_LOC;
+}
+// search UI
+let searchTimer=null, searchSeq=0;
+function openLoc(){
+  document.getElementById("locBg").hidden=false; document.body.style.overflow="hidden";
+  document.getElementById("shareUrl").value=shareLink();
+  document.getElementById("locInput").value=""; renderRecent();
+  setTimeout(()=>document.getElementById("locInput").focus(),50);
+}
+function closeLoc(){ document.getElementById("locBg").hidden=true; document.body.style.overflow=""; }
+function locItem(label,sub,loc,removable){
+  const b=document.createElement("button"); b.className="loc-item";
+  b.innerHTML=`<span><span class="ln">${esc(label)}</span><br><span class="ls">${esc(sub)}</span></span>${removable?'<span class="x" aria-label="Remove">✕</span>':""}`;
+  b.onclick=e=>{
+    if(e.target.classList.contains("x")){ store("wxRecent",(load("wxRecent")||[]).filter(r=>r.name!==loc.name)); renderRecent(); return; }
+    closeLoc(); setLocation(loc);
+  };
+  return b;
+}
+function renderRecent(){
+  const el=document.getElementById("locResults"); el.innerHTML="";
+  const rec=(load("wxRecent")||[]);
+  if(!rec.some(r=>r.name===DEFAULT_LOC.name)) rec.push(DEFAULT_LOC);
+  const h=document.createElement("h3"); h.textContent="Recent"; el.appendChild(h);
+  const c=document.createElement("div"); c.className="card"; el.appendChild(c);
+  rec.forEach(r=>c.appendChild(locItem(r.name,`${(+r.lat).toFixed(2)}, ${(+r.lon).toFixed(2)}`,r,r.name!==DEFAULT_LOC.name)));
+}
+async function doSearch(q){
+  const seq=++searchSeq, el=document.getElementById("locResults");
+  if(q.trim().length<2){ renderRecent(); return; }
+  el.innerHTML='<div class="loading"><span class="spin"></span>Searching…</div>';
+  try{
+    const j=await getJSON("https://geocoding-api.open-meteo.com/v1/search?"+new URLSearchParams({name:q.trim(),count:10,language:"en",format:"json"}));
+    if(seq!==searchSeq) return;
+    const rs=(j.results||[]).sort((a,b)=>(b.country_code==="US")-(a.country_code==="US"));
+    el.innerHTML="";
+    if(!rs.length){ el.innerHTML='<div class="loading">No places found. Try a town name, or a town and state like "Concord, NH".</div>'; return; }
+    const c=document.createElement("div"); c.className="card"; el.appendChild(c);
+    rs.forEach(r=>{
+      const label=placeLabel(r);
+      const sub=[r.admin2, r.country, r.population?`pop. ${r.population.toLocaleString()}`:""].filter(Boolean).join(" · ");
+      c.appendChild(locItem(label,sub,{name:label,lat:r.latitude,lon:r.longitude,tz:r.timezone},false));
+    });
+  }catch(e){ if(seq===searchSeq) el.innerHTML=`<div class="loading">Search failed (${esc(e.message)}). Check your connection.</div>`; }
+}
+document.getElementById("placeBtn").onclick=openLoc;
+document.getElementById("closeLoc").onclick=closeLoc;
+document.getElementById("locBg").onclick=e=>{ if(e.target.id==="locBg") closeLoc(); };
+document.getElementById("locInput").oninput=e=>{ clearTimeout(searchTimer); const v=e.target.value; searchTimer=setTimeout(()=>doSearch(v),300); };
+document.getElementById("locInput").onkeydown=e=>{ if(e.key==="Enter"){ clearTimeout(searchTimer); doSearch(e.target.value); } if(e.key==="Escape") closeLoc(); };
+document.getElementById("copyLink").onclick=async()=>{
+  const b=document.getElementById("copyLink");
+  try{ await navigator.clipboard.writeText(shareLink()); b.textContent="Copied ✓"; }
+  catch(e){ const i=document.getElementById("shareUrl"); i.select(); b.textContent="Select & copy"; }
+  setTimeout(()=>b.textContent="Copy link",2000);
+};
+document.getElementById("geoBtn").onclick=()=>{
+  const b=document.getElementById("geoBtn");
+  if(!navigator.geolocation){ b.textContent="Location isn't available on this device"; return; }
+  b.textContent="📍 Finding you…";
+  navigator.geolocation.getCurrentPosition(pos=>{
+    b.textContent="📍 Use my current location"; closeLoc();
+    setLocation({name:"Current location",lat:+pos.coords.latitude.toFixed(4),lon:+pos.coords.longitude.toFixed(4),tz:Intl.DateTimeFormat().resolvedOptions().timeZone,fromGeo:true});
+  },err=>{ b.textContent= err.code===1 ? "📍 Location permission denied. Allow it in Settings, or search instead" : "📍 Couldn't get your location. Try searching"; },{enableHighAccuracy:false,timeout:10000,maximumAge:600000});
+};
+
+setLocation(initialLoc(), false);
+if(new URLSearchParams(location.search).get("lat")) saveLoc();
 setInterval(()=>{ if(document.visibilityState==="visible") loadAll().catch(()=>{}); }, 30*60*1000);
 </script>
 </body>
