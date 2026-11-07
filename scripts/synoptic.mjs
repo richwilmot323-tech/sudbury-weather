@@ -142,7 +142,7 @@ export function track(framesCenters) {
     cs.forEach((c, ci) => prev.forEach((pc, pi) => {
       if (pc.type !== c.type) return;
       const d = distDeg(pc, c);
-      if (d < 12) pairs.push({ ci, pi, d });
+      if (d < 8 && Math.abs(pc.p - c.p) <= 20) pairs.push({ ci, pi, d }); // ~550 mi per 6 h max
     }));
     pairs.sort((a, b) => a.d - b.d);
     const usedC = new Set(), usedP = new Set();
