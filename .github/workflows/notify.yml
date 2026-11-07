@@ -1,0 +1,61 @@
+name: Weather notifications
+
+on:
+  schedule:
+    - cron: "50 * * * *"   # hourly; the script decides what (if anything) to send
+  push:
+    branches: [main]
+    paths: [".github/workflows/notify.yml", "scripts/notify.mjs"]   # sends a test notification
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: notify
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Restore notification state
+        uses: actions/cache/restore@v4
+        with:
+          path: .state
+          key: notify-state-${{ github.run_id }}
+          restore-keys: notify-state-
+      - name: Build and send
+        env:
+          MODE: ${{ github.event_name == 'push' && 'test' || 'auto' }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC || 'wx-sudbury-4b50d623a828' }}
+          APP_URL: https://richwilmot323-tech.github.io/sudbury-weather/
+          WX_NAME: Sudbury, MA
+          WX_LAT: "42.3834"
+          WX_LON: "-71.4162"
+          WX_TZ: America/New_York
+          MORNING_HOUR: "6"
+          STATE_FILE: .state/notify.json
+        run: node scripts/notify.mjs
+      - name: Save notification state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .state
+          key: notify-state-${{ github.run_id }}
+      - name: Keep the schedule alive
+        # GitHub pauses scheduled workflows after 60 days without commits
+        if: github.event_name == 'schedule'
+        run: |
+          age=$(( $(date +%s) - $(git log -1 --format=%ct) ))
+          if [ $age -gt $((45*86400)) ]; then
+            date -u > .github/keepalive
+            git config user.name "weather-bot"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .github/keepalive && git commit -m "keepalive" && git push
+          fi
