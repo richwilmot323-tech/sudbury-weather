@@ -751,11 +751,16 @@ function initRadar(){
   if(typeof L==="undefined"){ document.getElementById("map").innerHTML="<div class='loading'>Map library failed to load.</div>"; return; }
   map=L.map("map",{zoomControl:true,attributionControl:true}).setView([LAT,LON],8);
   const dark=matchMedia("(prefers-color-scheme: dark)").matches;
-  L.tileLayer(`https://{s}.basemaps.cartocdn.com/${dark?"dark_all":"light_all"}/{z}/{x}/{y}{r}.png`,{subdomains:"abcd",maxZoom:12,attribution:"© OpenStreetMap © CARTO"}).addTo(map);
+  const esri=n=>`https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/${n}/MapServer/tile/{z}/{y}/{x}`;
+  const base=L.tileLayer(esri(dark?"World_Dark_Gray_Base":"World_Light_Gray_Base"),{maxZoom:12,attribution:"Basemap © Esri"}).addTo(map);
+  // fall back to OpenStreetMap if Esri tiles fail
+  let baseErrs=0; base.on("tileerror",()=>{ if(++baseErrs===4){ map.removeLayer(base); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:12,attribution:"© OpenStreetMap"}).addTo(map).bringToBack(); } });
+  map.createPane("labels"); map.getPane("labels").style.zIndex=650; map.getPane("labels").style.pointerEvents="none";
   OFFSETS.forEach((m,i)=>{
     const layer=m===0?"nexrad-n0q-900913":`nexrad-n0q-900913-m${String(m).padStart(2,"0")}m`;
     radarLayers.push(L.tileLayer(`https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/${layer}/{z}/{x}/{y}.png?_=${Math.floor(Date.now()/300000)}`,{opacity:0,maxZoom:12,attribution:i===0?"Radar: IEM NEXRAD":""}).addTo(map));
   });
+  L.tileLayer(esri(dark?"World_Dark_Gray_Reference":"World_Light_Gray_Reference"),{maxZoom:12,pane:"labels"}).addTo(map);
   L.circleMarker([LAT,LON],{radius:6,color:"#fff",weight:2,fillColor:cssv("--accent"),fillOpacity:1}).addTo(map).bindTooltip("Sudbury");
   showFrame(10); play();
 }
