@@ -21,12 +21,20 @@ async function fetchBatch(pts) {
     hourly: "pressure_msl,precipitation,snowfall,wind_speed_250hPa,wind_direction_250hPa",
     models: "gfs_global", wind_speed_unit: "kn", forecast_days: "11", timezone: "GMT", cell_selection: "nearest",
   });
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const r = await fetch("https://api.open-meteo.com/v1/forecast?" + p, { headers: { "User-Agent": "sudbury-weather synoptic map" } });
-    if (r.ok) { const j = await r.json(); return Array.isArray(j) ? j : [j]; }
-    const msg = await r.text();
-    console.warn(`batch HTTP ${r.status} (attempt ${attempt + 1}): ${msg.slice(0, 200)}`);
-    await sleep(r.status === 429 ? 65000 : 10000);
+  for (let attempt = 0; attempt < 7; attempt++) {
+    let wait = 10000 * (attempt + 1);
+    try {
+      const r = await fetch("https://api.open-meteo.com/v1/forecast?" + p, {
+        headers: { "User-Agent": "sudbury-weather synoptic map" }, signal: AbortSignal.timeout(90000) });
+      if (r.ok) { const j = await r.json(); return Array.isArray(j) ? j : [j]; }
+      const msg = await r.text();
+      console.warn(`batch HTTP ${r.status} (attempt ${attempt + 1}): ${msg.slice(0, 200)}`);
+      if (r.status === 429) wait = 65000;
+    } catch (e) {
+      // network-level failures (connect timeouts, resets) are retried too
+      console.warn(`batch network error (attempt ${attempt + 1}): ${e.cause?.code || e.name}: ${e.message}`);
+    }
+    await sleep(wait);
   }
   throw new Error("Open-Meteo batch failed after retries");
 }
