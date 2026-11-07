@@ -10,3 +10,7 @@
 - **During the day (6 AM–10 PM):** new NWS alerts, a new precipitation type, a big jump in snow totals, or damaging gusts. NWS warnings also come through overnight.
 
 To keep the topic private, add a repo secret named `NTFY_TOPIC`; it overrides the default in the workflow.
+
+## Pressure map
+
+`.github/workflows/synoptic.yml` runs `scripts/synoptic.mjs` every 6 hours. It pulls GFS sea-level pressure, 6-hour precipitation and 250 mb winds on a 2.5° grid from the central Pacific to the western Atlantic (~900 points, 10 days, 6-hourly). It then detects highs and lows, links them into tracks, and force-pushes `synoptic.json` to the `data` branch. The app's Pressure tab reads it from raw.githubusercontent.com.

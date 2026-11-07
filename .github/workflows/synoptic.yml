@@ -1,0 +1,40 @@
+name: Pressure map data
+
+on:
+  schedule:
+    - cron: "40 4,10,16,22 * * *"   # ~4.5 h after each GFS run (00/06/12/18Z), when Open-Meteo has it
+  push:
+    branches: [main]
+    paths: [".github/workflows/synoptic.yml", "scripts/synoptic.mjs"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: synoptic
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Fetch GFS grid and find highs/lows
+        env:
+          OUT: /tmp/out/synoptic.json
+        run: node scripts/synoptic.mjs
+      - name: Publish to the 'data' branch (single commit, history doesn't grow)
+        run: |
+          git config user.name "weather-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan data-tmp
+          git rm -rf --quiet .
+          cp /tmp/out/synoptic.json .
+          git add synoptic.json
+          git commit --quiet -m "Pressure map data $(date -u +%FT%HZ)"
+          git push --force origin HEAD:data
