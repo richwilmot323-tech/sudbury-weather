@@ -112,7 +112,7 @@ function activeAlerts() {
 async function send({ title, message, tags = [], priority = 3 }) {
   const body = {
     topic: env.NTFY_TOPIC, title, message, tags, priority, click: APP_URL,
-    actions: [{ action: "view", label: "Open forecast", url: APP_URL }],
+    actions: [{ action: "view", label: "Open Blendcast", url: APP_URL }],
   };
   if (DRY) { console.log("\n=== WOULD SEND ===\n" + JSON.stringify({ title, message, tags, priority }, null, 2)); return; }
   if (!env.NTFY_TOPIC) throw new Error("NTFY_TOPIC not set");

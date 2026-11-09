@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Blended Forecast</title>
+<title>Blendcast</title>
 <meta name="theme-color" content="#f6f7f9">
-<meta name="apple-mobile-web-app-title" content="Wx Blend">
+<meta name="apple-mobile-web-app-title" content="Blendcast">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -182,6 +182,7 @@ a{color:var(--accent)}
 .clstn{font:inherit;font-size:13px;padding:4px 6px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);max-width:100%}
 .linkbanner{padding:10px 12px;margin-bottom:12px;font-size:13.5px}
 .lbbtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.brand{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:2px}
 footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
 </style>
 </head>
@@ -189,6 +190,7 @@ footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
 <div class="wrap">
   <header class="top">
     <div>
+      <div class="brand">Blendcast</div>
       <button class="placebtn" id="placeBtn" aria-label="Change location"><span class="place" id="placeName">Weather</span><span class="chev">Change ▾</span></button>
       <div class="sub" id="updated">Loading forecasts…</div>
     </div>
@@ -282,7 +284,7 @@ footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
     </div>
   </section>
 
-  <footer>Data: National Weather Service (api.weather.gov) · Models via Open-Meteo · Radar: Iowa Environmental Mesonet. Blended forecast, not an official NWS product.</footer>
+  <footer>Blendcast · Data: National Weather Service (api.weather.gov) · Models via Open-Meteo · Radar: Iowa Environmental Mesonet. Blended forecast, not an official NWS product.</footer>
 </div>
 
 <div class="sheet-bg" id="sheetBg" hidden>
@@ -325,7 +327,7 @@ footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
 <script>
 "use strict";
 /* ---------- self-update: home-screen apps can keep a stale copy, so check for a newer build on open ---------- */
-const BUILD="202611091637";
+const BUILD="202611091640";
 async function checkForUpdate(){
   try{
     const r=await fetch(location.pathname+"?check="+Date.now(),{cache:"no-store"});
@@ -1550,7 +1552,7 @@ function saveLoc(){
 }
 function showPlace(){
   document.getElementById("placeName").textContent=PLACE.name;
-  document.title=`${PLACE.name} · Blended Forecast`;
+  document.title=`${PLACE.name} · Blendcast`;
   if(marker) marker.bindTooltip(PLACE.name.split(",")[0]);
 }
 function setLocation(loc, persist=true){
