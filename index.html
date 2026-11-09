@@ -58,7 +58,7 @@ header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:1
 .alert details summary{cursor:pointer;list-style:none}
 .alert details p{white-space:pre-wrap;color:var(--ink-2);font-size:12.5px;margin:8px 0 0}
 nav.tabs{display:flex;gap:4px;background:var(--line-soft);padding:4px;border-radius:12px;margin-bottom:12px;position:sticky;top:6px;z-index:500}
-nav.tabs button{flex:1;border:0;background:transparent;padding:8px 6px;border-radius:9px;font-weight:600;font-size:13.5px;color:var(--ink-2);cursor:pointer}
+nav.tabs button{flex:1;border:0;background:transparent;padding:8px 2px;border-radius:9px;font-weight:600;font-size:12.5px;white-space:nowrap;color:var(--ink-2);cursor:pointer}
 nav.tabs button[aria-selected="true"]{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
 .view[hidden]{display:none}
 .days{overflow:hidden}
@@ -167,6 +167,19 @@ a{color:var(--accent)}
 .ptoggles input{width:18px;height:18px;accent-color:var(--accent)}
 .pinfo{padding:12px 14px;margin-top:8px;font-size:13.5px;line-height:1.55}
 .plegend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink-3);margin:8px 4px 0;align-items:center}
+.seg{display:flex;gap:4px;background:var(--line-soft);padding:3px;border-radius:10px;flex-wrap:wrap}
+.seg button{flex:1;border:0;background:transparent;padding:7px 6px;border-radius:8px;font-weight:600;font-size:12.5px;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+.clctl{padding:10px;display:grid;gap:8px;margin-bottom:10px}
+.clctl select,.clctl input[type=date]{font:inherit;font-size:14px;padding:7px 9px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--ink);width:100%}
+#clCustom{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center}
+#clCustom[hidden]{display:none}
+.clrange{color:var(--ink-3);font-size:12.5px;margin:2px 4px 8px}
+.clstat{font:inherit;text-align:left;cursor:pointer;color:inherit}
+.clstat:disabled{cursor:default}
+.clstat .rk{font-size:11.5px;font-weight:600;color:var(--accent);margin-top:3px}
+.clrow{cursor:pointer}.clrow:hover td{background:var(--line-soft)}
+.clstn{font:inherit;font-size:13px;padding:4px 6px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);max-width:100%}
 footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
 </style>
 </head>
@@ -187,6 +200,7 @@ footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
     <button role="tab" aria-selected="true" data-tab="forecast">10-Day</button>
     <button role="tab" aria-selected="false" data-tab="radar">Radar</button>
     <button role="tab" aria-selected="false" data-tab="pressure">Pressure</button>
+    <button role="tab" aria-selected="false" data-tab="climate">Climate</button>
     <button role="tab" aria-selected="false" data-tab="sources">Sources</button>
   </nav>
 
@@ -235,8 +249,26 @@ footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
     <div class="legend-note"><span id="pRun"></span>. Precipitation is the total over the 6 hours ending at each time. Highs and lows are found automatically from the model's sea-level pressure, so this map doesn't show fronts.</div>
   </section>
 
+  <section class="view" id="view-climate" hidden>
+    <div class="card clctl">
+      <div class="seg" id="clMode" role="group" aria-label="Date range">
+        <button data-m="ytd">Year to date</button><button data-m="season">Season (Jul–Jun)</button><button data-m="custom">Custom</button>
+      </div>
+      <select id="clYear" aria-label="Year"></select>
+      <div id="clCustom" hidden>
+        <input type="date" id="clStart" aria-label="Start date"><input type="date" id="clEnd" aria-label="End date"><button class="refresh" id="clApply">Apply</button>
+      </div>
+      <div class="sub" id="clErr" style="color:var(--bad)"></div>
+      <div class="seg" id="clType" role="group" aria-label="Precipitation type">
+        <button data-t="all">All precip</button><button data-t="rain">Rain</button><button data-t="snow">Snow</button><button data-t="ice">Ice</button>
+      </div>
+    </div>
+    <div id="climBody"><div class="loading">Open this tab to load observations.</div></div>
+  </section>
+
   <section class="view" id="view-sources" hidden>
     <div id="sourceList"></div>
+    <div class="legend-note" style="margin-bottom:8px">Climate tab: NOAA station observations and 1991–2020 normals via RCC-ACIS; ice from the Iowa Environmental Mesonet airport archive.</div>
     <h3>How the blend works</h3>
     <div class="card prose">
       <p><b>Temperature:</b> each source's hourly temperatures are turned into a high and low for each calendar day. The blend is the average across sources. The range shows the coolest and warmest source.</p>
@@ -259,6 +291,18 @@ footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
       <button class="iconbtn" id="closeSheet" aria-label="Close">✕</button>
     </div>
     <div id="sheetBody"></div>
+  </div>
+</div>
+
+<div class="sheet-bg" id="climBg" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="clMTitle">
+    <div class="sheet-head">
+      <button class="iconbtn" id="clPrevM" aria-label="Previous month">‹</button>
+      <h2 id="clMTitle">Month</h2>
+      <button class="iconbtn" id="clNextM" aria-label="Next month">›</button>
+      <button class="iconbtn" id="closeClim" aria-label="Close">✕</button>
+    </div>
+    <div id="clMBody"></div>
   </div>
 </div>
 
@@ -804,8 +848,8 @@ function drawCharts(d){
             y:{grid:{color:grid},ticks:{color:ink3,font},border:{display:false}}}};
   const tc=cssv("--temp"), band=cssv("--temp-band");
   charts.push(new Chart(document.getElementById("cTemp"),{type:"line",data:{labels,datasets:[
-    {data:H.map(h=>h.tMin),borderWidth:0,pointRadius:0,fill:false,tension:.35},
-    {data:H.map(h=>h.tMax),borderWidth:0,pointRadius:0,fill:"-1",backgroundColor:band,tension:.35},
+    {data:H.map(h=>h.tMin),borderWidth:0,pointRadius:0,fill:false,tension:.35,order:10},
+    {data:H.map(h=>h.tMax),borderWidth:0,pointRadius:0,fill:"-1",backgroundColor:band,tension:.35,order:10},
     {data:H.map(h=>h.t),borderColor:tc,borderWidth:2,pointRadius:0,pointHoverRadius:5,pointHoverBackgroundColor:tc,pointHoverBorderColor:cssv("--card"),pointHoverBorderWidth:2,tension:.35,fill:false}
   ]},options:{...base,plugins:{...base.plugins,tooltip:{...base.plugins.tooltip,filter:i=>i.datasetIndex===2,
     callbacks:{label:c=>{const h=H[c.dataIndex];return [`Blend ${r0(h.t)}°F`,`Sources ${r0(h.tMin)}–${r0(h.tMax)}° (${h.n})`];}}}},
@@ -1056,6 +1100,404 @@ function jetStart(){
 function jetStop(){ J.run=false; cancelAnimationFrame(J.raf); if(J.ctx) J.ctx.clearRect(0,0,J.canvas.width,J.canvas.height); const l=document.getElementById("jetLegend"); if(l) l.hidden=true; }
 document.addEventListener("visibilitychange",()=>{ if(document.hidden) jetStop(); else if(P.opts.jet&&P.map&&!document.getElementById("view-pressure").hidden) jetStart(); });
 
+/* ---------- climate (observed vs normal) ---------- */
+const ACIS="https://data.rcc-acis.org";
+const CL={meta:null, metaFor:null, stations:{}, chosen:{}, override:load("wxClimStn")||{}, mode:"ytd", year:null, start:null, end:null,
+  type:"all", data:null, ice:null, iceNorm:null, charts:[], mcharts:[], cache:{}, month:null, busy:0};
+const CTYPE={all:{label:"All precipitation",unit:"″",col:"--accent"},rain:{label:"Rain",unit:"″",col:"--rain"},snow:{label:"Snow",unit:"″",col:"--snow"},ice:{label:"Ice",unit:" hrs",col:"--ice"}};
+const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const todayStr=()=>localKey(new Date()).slice(0,10);
+const pv=v=>{ if(v==null||v==="M"||v==="S"||v==="") return null; if(v==="T") return 0; const n=parseFloat(v); return isFinite(n)?n:null; };
+const daysBetween=(a,b)=>Math.round((Date.parse(b+"T12:00:00Z")-Date.parse(a+"T12:00:00Z"))/864e5);
+const fmtD=(d,y)=>new Date(d+"T12:00:00Z").toLocaleDateString("en-US",{month:"short",day:"numeric",...(y?{year:"numeric"}:{}),timeZone:"UTC"});
+const ord=n=>n+(["th","st","nd","rd"][(n%100>10&&n%100<14)?0:Math.min(n%10,4)%4]||"th");
+const miles=(a,o)=>gcKm(LAT,LON,a,o)*0.621;
+async function acis(ep,body){ const r=await fetch(`${ACIS}/${ep}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); if(!r.ok) throw new Error(`ACIS HTTP ${r.status}`); const j=await r.json(); if(j.error) throw new Error(j.error); return j; }
+
+function climDefaultRange(){
+  const t=todayStr(), y=+t.slice(0,4), m=+t.slice(5,7), yest=addDays(t,-1);
+  if(CL.mode==="season"){ const sy=CL.year??(m>=7?y:y-1); CL.year=sy; CL.start=`${sy}-07-01`; const e=`${sy+1}-06-30`; CL.end=e<yest?e:yest; }
+  else if(CL.mode==="ytd"){ const yy=CL.year??y; CL.year=yy; CL.start=`${yy}-01-01`; const e=`${yy}-12-31`; CL.end=e<yest?e:yest; }
+  else if(!CL.start||!CL.end){ CL.end=yest; CL.start=addDays(yest,-89); } // custom
+}
+async function climMeta(){
+  const key=`${LAT.toFixed(3)},${LON.toFixed(3)}`;
+  if(CL.metaFor===key) return;
+  const t=todayStr(), recent=addDays(t,-45);
+  let meta=[];
+  for(const pad of [0.75,1.5]){
+    const bbox=[LON-pad*1.3,LAT-pad,LON+pad*1.3,LAT+pad].map(v=>v.toFixed(3)).join(",");
+    const j=await acis("StnMeta",{bbox,elems:"pcpn,snow,maxt,mint",meta:"name,sids,ll,valid_daterange,elev"});
+    meta=(j.meta||[]).filter(s=>s.ll);
+    if(meta.some(s=>(s.valid_daterange[0]||[])[1]>=recent)) break;
+  }
+  const ok=r=>r&&r.length&&r[0]<="1995-12-31"&&r[1]>=recent;
+  const sid=s=>(s.sids.find(x=>/ (1|2|3|9)$/.test(x))||s.sids[0]).split(" ")[0];
+  const st=meta.map(s=>({sid:sid(s),name:s.name.replace(/\b([A-Z])([A-Z]+)/g,(m,a,b)=>a+b.toLowerCase()),lat:s.ll[1],lon:s.ll[0],mi:miles(s.ll[1],s.ll[0]),
+    faa:(s.sids.find(x=>/ 3$/.test(x))||"").split(" ")[0]||null, vd:s.valid_daterange}));
+  st.sort((a,b)=>a.mi-b.mi);
+  CL.stations={
+    temp:st.filter(s=>ok(s.vd[2])&&ok(s.vd[3])).slice(0,4),
+    precip:st.filter(s=>ok(s.vd[0])).slice(0,4),
+    snow:st.filter(s=>ok(s.vd[1])).slice(0,4),
+    asos:st.filter(s=>s.faa&&s.vd[0]&&s.vd[0][1]>=recent).slice(0,2)
+  };
+  CL.metaFor=key; CL.cache={}; CL.iceNorm=null;
+}
+async function climStation(sid,start,end){
+  const k=`${sid}|${start}|${end}`;
+  if(CL.cache[k]) return CL.cache[k];
+  const els=["maxt","mint","avgt","pcpn","snow"];
+  const j=await acis("StnData",{sid,sdate:start,edate:end,elems:[...els.map(n=>({name:n})),...els.map(n=>({name:n,normal:"1"}))]});
+  const rows=(j.data||[]).map(r=>({d:r[0],tx:pv(r[1]),tn:pv(r[2]),ta:pv(r[3]),p:pv(r[4]),s:pv(r[5]),ntx:pv(r[6]),ntn:pv(r[7]),nta:pv(r[8]),np:pv(r[9]),ns:pv(r[10])}));
+  return CL.cache[k]=rows;
+}
+function completeness(rows,obs,norm){
+  if(!rows||!rows.length) return {obs:0,norm:0};
+  return {obs:rows.filter(r=>r[obs]!=null).length/rows.length, norm:rows.filter(r=>r[norm]!=null).length/rows.length};
+}
+async function climLoad(){
+  climDefaultRange();
+  const myBusy=++CL.busy;
+  const body=document.getElementById("climBody");
+  body.innerHTML='<div class="loading"><span class="spin"></span>Pulling observations and normals from NOAA…</div>';
+  try{
+    await climMeta();
+    const groups={temp:["ta","nta"],precip:["p","np"],snow:["s","ns"]};
+    const sids=[...new Set(Object.values(CL.stations).flatMap(a=>a.slice(0,3)).map(s=>s.sid).concat(Object.values(CL.override)))];
+    const rowsBy={};
+    await Promise.all(sids.map(async s=>{ try{ rowsBy[s]=await climStation(s,CL.start,CL.end); }catch(e){ rowsBy[s]=null; } }));
+    if(myBusy!==CL.busy) return;
+    CL.chosen={};
+    for(const [g,[o,n]] of Object.entries(groups)){
+      const cands=CL.stations[g];
+      const over=CL.override[g]&&cands.find(c=>c.sid===CL.override[g]);
+      let pick=null;
+      if(over&&rowsBy[over.sid]) pick=over;
+      else {
+        for(const c of cands.slice(0,3)){ const q=completeness(rowsBy[c.sid],o,n); c.q=q; if(q.obs>=0.95&&q.norm>=0.9){ pick=c; break; } }
+        if(!pick){ const scored=cands.slice(0,3).filter(c=>rowsBy[c.sid]).map(c=>({c,q:completeness(rowsBy[c.sid],o,n)})).sort((a,b)=>(b.q.obs+b.q.norm)-(a.q.obs+a.q.norm)); pick=scored[0]&&scored[0].c; }
+      }
+      if(pick){ pick.q=completeness(rowsBy[pick.sid],o,n); CL.chosen[g]=pick; }
+    }
+    // assemble aligned daily series
+    const days=[]; for(let d=CL.start; d<=CL.end; d=addDays(d,1)) days.push(d);
+    const by=g=>{ const c=CL.chosen[g]; const m={}; (c&&rowsBy[c.sid]||[]).forEach(r=>m[r.d]=r); return m; };
+    const T=by("temp"), Pp=by("precip"), S=by("snow");
+    CL.data=days.map(d=>{
+      const t=T[d]||{}, p=Pp[d]||{}, s=S[d]||{};
+      const snowWater=v=>v==null?null:v/10;
+      const rain=(p.p==null)?null:Math.max(0,p.p-(s.s!=null?Math.min(p.p,snowWater(s.s)):0));
+      const nrain=(p.np==null)?null:Math.max(0,p.np-(s.ns!=null?Math.min(p.np,snowWater(s.ns)):0));
+      return {d,tx:t.tx??null,tn:t.tn??null,ta:t.ta??(t.tx!=null&&t.tn!=null?(t.tx+t.tn)/2:null),ntx:t.ntx??null,ntn:t.ntn??null,nta:t.nta??null,
+        all:p.p??null,nall:p.np??null,rain,nrain,snow:s.s??null,nsnow:s.ns??null};
+    });
+    CL.rank=null; CL.ice=null; CL.iceNorm=CL.iceNormFor===`${CL.metaFor}|${CL.start}|${CL.end}`?CL.iceNorm:null;
+    climRender();
+    climRanks().then(()=>{ if(myBusy===CL.busy) climRenderStats(); });
+    climIce().then(()=>{ if(myBusy===CL.busy){ climRenderStats(); if(CL.type==="ice") climRenderCharts(); climRenderMonths(); } });
+    if(CL.type==="ice") climIceNormal();
+  }catch(e){
+    console.error(e);
+    body.innerHTML=`<div class="loading">Couldn't load climate data (${esc(e.message)}). NOAA's climate service covers US stations only. Tap the tab again to retry.</div>`;
+  }
+}
+async function climRanks(){
+  const N=daysBetween(CL.start,CL.end)+1;
+  if(N>366||N<7){ CL.rank=null; return; }
+  const md=CL.end.slice(5), out={};
+  const req=async(g,name,reduce,key)=>{
+    const c=CL.chosen[g]; if(!c) return;
+    try{
+      const j=await acis("StnData",{sid:c.sid,sdate:`1880-${md}`,edate:CL.end,elems:[{name,interval:[1,0,0],duration:N,reduce:{reduce,add:"mcnt"},maxmissing:Math.max(2,Math.round(N*0.05))}]});
+      const ys=(j.data||[]).map(r=>({y:+r[0].slice(0,4),v:pv(r[1][0])})).filter(x=>x.v!=null);
+      const me=ys.find(x=>x.y===+CL.end.slice(0,4));
+      if(!me||ys.length<10){ out[key]=null; return; }
+      const higher=ys.filter(x=>x.v>me.v).length+1, lower=ys.filter(x=>x.v<me.v).length+1;
+      out[key]={higher,lower,n:ys.length,since:ys[0].y,me:me.v};
+    }catch(e){ out[key]=null; }
+  };
+  await Promise.all([req("precip","pcpn","sum","all"),req("snow","snow","sum","snow"),req("temp","avgt","mean","temp")]);
+  CL.rank=out;
+}
+/* ---- ice from airport hourly reports (IEM ASOS archive) ---- */
+const ICE_RE=/FZRA|FZDZ|PL|(^|[^A-Z])IP/;
+function coldSegments(start,end){
+  const segs=[]; let y=+start.slice(0,4)-1;
+  for(;y<=+end.slice(0,4);y++){
+    const s=`${y}-10-01`, e=`${y+1}-04-30`;
+    const a=s>start?s:start, b=e<end?e:end;
+    if(a<=b) segs.push([a,b]);
+  }
+  return segs;
+}
+async function iemIce(faa,a,b){
+  const k=`ice|${faa}|${a}|${b}`; if(CL.cache[k]) return CL.cache[k];
+  const [y1,m1,d1]=a.split("-").map(Number), e=addDays(b,1), [y2,m2,d2]=e.split("-").map(Number);
+  const p=new URLSearchParams({station:faa,data:"wxcodes",year1:y1,month1:m1,day1:d1,year2:y2,month2:m2,day2:d2,tz:TZ,format:"onlycomma",latlon:"no",missing:"M",trace:"T"});
+  p.append("report_type","3"); p.append("report_type","4");
+  const r=await fetch("https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?"+p);
+  if(!r.ok) throw new Error("IEM HTTP "+r.status);
+  const txt=await r.text(), hrs={};
+  let lines=0;
+  txt.split("\n").forEach(l=>{ const c=l.split(","); if(c.length<3||c[0]==="station") return; lines++; if(ICE_RE.test(c[2])) { const h=c[1].slice(0,13); hrs[h]=1; } });
+  const byDay={}; Object.keys(hrs).forEach(h=>{ const d=h.slice(0,10); byDay[d]=(byDay[d]||0)+1; });
+  return CL.cache[k]={byDay,lines};
+}
+async function climIce(){
+  const a=CL.stations.asos&&CL.stations.asos[0]; if(!a){ CL.ice={none:true}; return; }
+  try{
+    const segs=coldSegments(CL.start,CL.end), byDay={}; let lines=0;
+    for(const [s,e] of segs){ const r=await iemIce(a.faa,s,e); Object.assign(byDay,r.byDay); lines+=r.lines; }
+    CL.ice={stn:a,byDay,hours:Object.values(byDay).reduce((x,y)=>x+y,0),days:Object.keys(byDay).length,segs:segs.length,lines};
+  }catch(e){ CL.ice={err:e.message}; }
+}
+async function climIceNormal(){
+  const key=`${CL.metaFor}|${CL.start}|${CL.end}`;
+  if(CL.iceNorm&&CL.iceNormFor===key) return;
+  const a=CL.stations.asos&&CL.stations.asos[0]; if(!a) return;
+  if(daysBetween(CL.start,CL.end)>400){ CL.iceNorm={tooLong:true}; CL.iceNormFor=key; climRenderCharts(); return; }
+  CL.iceNorm={loading:true}; CL.iceNormFor=key; climRenderStats(); climRenderCharts();
+  const shift=(d,k)=>`${+d.slice(0,4)-k}${d.slice(4)}`.replace(/-02-29$/,"-02-28");
+  const years=[...Array(10)].map((_,i)=>i+1), res=[];
+  const jobs=years.flatMap(k=>coldSegments(shift(CL.start,k),shift(CL.end,k)).map(sg=>({k,sg})));
+  let i=0;
+  const worker=async()=>{ while(i<jobs.length){ const j=jobs[i++]; try{ const r=await iemIce(a.faa,j.sg[0],j.sg[1]); res.push({k:j.k,byDay:r.byDay}); }catch(e){} } };
+  await Promise.all([worker(),worker(),worker(),worker()]);
+  if(CL.iceNormFor!==key) return;
+  // per-day-of-range average hours: map each shifted day back onto the selected range
+  const avg={}; let yrs=new Set(res.map(r=>r.k));
+  res.forEach(r=>Object.entries(r.byDay).forEach(([d,h])=>{ const back=`${+d.slice(0,4)+r.k}${d.slice(4)}`; avg[back]=(avg[back]||0)+h; }));
+  const n=Math.max(1,yrs.size);
+  Object.keys(avg).forEach(d=>avg[d]/=n);
+  const days=res.reduce((s,r)=>s+Object.keys(r.byDay).length,0)/n;
+  CL.iceNorm={avg,hours:Object.values(avg).reduce((x,y)=>x+y,0),days,years:n,from:+CL.end.slice(0,4)-10,to:+CL.end.slice(0,4)-1};
+  climRenderStats(); if(CL.type==="ice") climRenderCharts(); climRenderMonths();
+}
+
+/* ---- aggregation ---- */
+function sumK(rows,k){ let s=0,n=0; rows.forEach(r=>{ if(r[k]!=null){ s+=r[k]; n++; } }); return {s,n}; }
+function meanK(rows,k){ const v=rows.map(r=>r[k]).filter(x=>x!=null); return v.length?v.reduce((a,b)=>a+b,0)/v.length:null; }
+function iceOf(d){ return CL.ice&&CL.ice.byDay?(CL.ice.byDay[d]||0):null; }
+function iceNormOf(d){ return CL.iceNorm&&CL.iceNorm.avg?(CL.iceNorm.avg[d]||0):null; }
+function seriesFor(type){
+  if(type==="ice") return CL.data.map(r=>({d:r.d,a:iceOf(r.d),n:iceNormOf(r.d)}));
+  return CL.data.map(r=>({d:r.d,a:r[type],n:r["n"+type]}));
+}
+function monthsOf(){
+  const m={}; CL.data.forEach(r=>{ const k=r.d.slice(0,7); (m[k]=m[k]||[]).push(r); });
+  return Object.entries(m).map(([k,rows])=>{
+    const o={k,rows,label:MONTHS[+k.slice(5)-1]+" "+k.slice(2,4),partial:rows.length<new Date(Date.UTC(+k.slice(0,4),+k.slice(5),0)).getUTCDate()};
+    ["all","rain","snow"].forEach(t=>{ o[t]=sumK(rows,t).s; o["n"+t]=sumK(rows,"n"+t).s; o[t+"Miss"]=rows.length-sumK(rows,t).n; });
+    o.ta=meanK(rows,"ta"); o.nta=meanK(rows,"nta"); o.dep=(o.ta!=null&&o.nta!=null)?o.ta-o.nta:null;
+    o.tx=Math.max(...rows.map(r=>r.tx??-999)); o.tn=Math.min(...rows.map(r=>r.tn??999));
+    o.ice=CL.ice&&CL.ice.byDay?rows.reduce((s,r)=>s+(iceOf(r.d)||0),0):null;
+    o.iceDays=CL.ice&&CL.ice.byDay?rows.filter(r=>iceOf(r.d)>0).length:null;
+    o.nice=CL.iceNorm&&CL.iceNorm.avg?rows.reduce((s,r)=>s+(iceNormOf(r.d)||0),0):null;
+    return o;
+  });
+}
+
+/* ---- rendering ---- */
+function initClimate(){
+  if(!CL.inited){
+    CL.inited=true;
+    const yNow=+todayStr().slice(0,4), ySel=document.getElementById("clYear");
+    document.querySelectorAll("#clMode button").forEach(b=>b.onclick=()=>{ CL.mode=b.dataset.m; CL.year=null; climControls(); if(CL.mode!=="custom") climLoad(); });
+    document.querySelectorAll("#clType button").forEach(b=>b.onclick=()=>{ CL.type=b.dataset.t; climControls(); if(CL.data){ climRenderCharts(); climRenderMonths(); if(CL.type==="ice") climIceNormal(); } });
+    ySel.onchange=()=>{ CL.year=+ySel.value; climLoad(); };
+    document.getElementById("clApply").onclick=()=>{
+      const s=document.getElementById("clStart").value, e=document.getElementById("clEnd").value;
+      if(!s||!e||s>e){ document.getElementById("clErr").textContent="Pick a start date before the end date."; return; }
+      if(daysBetween(s,e)>366*5){ document.getElementById("clErr").textContent="Ranges up to 5 years are supported."; return; }
+      document.getElementById("clErr").textContent=""; CL.start=s; CL.end=e>addDays(todayStr(),-1)?addDays(todayStr(),-1):e; climLoad();
+    };
+    document.getElementById("closeClim").onclick=climCloseMonth;
+    document.getElementById("climBg").onclick=e=>{ if(e.target.id==="climBg") climCloseMonth(); };
+    document.getElementById("clPrevM").onclick=()=>climMonth(CL.month-1);
+    document.getElementById("clNextM").onclick=()=>climMonth(CL.month+1);
+  }
+  climControls();
+  if(!CL.data||CL.metaFor!==`${LAT.toFixed(3)},${LON.toFixed(3)}`) climLoad();
+}
+function climControls(){
+  climDefaultRange();
+  document.querySelectorAll("#clMode button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.m===CL.mode));
+  document.querySelectorAll("#clType button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.t===CL.type));
+  const yNow=+todayStr().slice(0,4), m=+todayStr().slice(5,7), ySel=document.getElementById("clYear");
+  const top=CL.mode==="season"?(m>=7?yNow:yNow-1):yNow;
+  ySel.innerHTML=[...Array(60)].map((_,i)=>top-i).map(y=>`<option value="${y}" ${y===CL.year?"selected":""}>${CL.mode==="season"?`${y}–${String(y+1).slice(2)} season`:y}</option>`).join("");
+  ySel.hidden=CL.mode==="custom";
+  document.getElementById("clCustom").hidden=CL.mode!=="custom";
+  if(CL.mode==="custom"){
+    const t=addDays(todayStr(),-1);
+    const s=document.getElementById("clStart"), e=document.getElementById("clEnd");
+    s.max=e.max=t; if(!s.value) s.value=CL.start||addDays(t,-89); if(!e.value) e.value=CL.end||t;
+  }
+}
+function climRender(){
+  document.getElementById("climBody").innerHTML=`
+    <div class="clrange" id="clRangeLbl"></div>
+    <div class="stats" id="clStats"></div>
+    <div class="card chartbox"><div class="ct" id="clCumT"></div><div class="canvas-wrap"><canvas id="clCum" role="img"></canvas></div></div>
+    <div class="card chartbox"><div class="ct" id="clMonT"></div><div class="canvas-wrap"><canvas id="clMon" role="img"></canvas></div></div>
+    <div class="card chartbox"><div class="ct">Average temperature vs normal, by month (°F)<span class="lg"><span><span class="sw" style="background:var(--warm)"></span>Warmer</span><span><span class="sw" style="background:var(--cold)"></span>Colder</span></span></div><div class="canvas-wrap" style="height:170px"><canvas id="clTemp" role="img" aria-label="Monthly temperature departure from normal"></canvas></div></div>
+    <h3>By month <span class="sub" style="text-transform:none;letter-spacing:0;font-weight:500">· tap a month for daily detail</span></h3>
+    <div class="card tablewrap" id="clMonths"></div>
+    <h3>Extremes</h3>
+    <div class="card prose" id="clExt"></div>
+    <h3>Stations</h3>
+    <div class="card prose" id="clStn"></div>`;
+  climRenderStats(); climRenderCharts(); climRenderMonths(); climRenderExtremes(); climRenderStations();
+}
+function climRenderStats(){
+  const el=document.getElementById("clStats"); if(!el||!CL.data) return;
+  document.getElementById("clRangeLbl").textContent=`${fmtD(CL.start,true)} – ${fmtD(CL.end,true)} · ${daysBetween(CL.start,CL.end)+1} days`;
+  const D=CL.data, r=CL.rank||{};
+  const tot=k=>sumK(D,k).s, miss=k=>D.length-sumK(D,k).n;
+  const pct=(a,n)=>n>0?Math.round(100*a/n)+"% of normal":"";
+  const dep=(a,n,u)=>{ const x=a-n; return `${x>=0?"+":"−"}${Math.abs(x).toFixed(u==="°"?1:2).replace(/\.?0+$/,u==="°"?".0":"")}${u}`; };
+  const rk=(x,hi,lo)=>{ if(!x) return ""; const top=x.higher<=x.lower; return `<div class="rk">${ord(top?x.higher:x.lower)} ${top?hi:lo} of ${x.n} years</div>`; };
+  const card=(t,k,v,sub,extra,click)=>`<button class="card stat clstat" data-t="${t}" ${click?"":"disabled"}><div class="k">${k}</div><div class="v">${v}</div><div class="r">${sub}</div>${extra||""}</button>`;
+  const A=tot("all"), NA=tot("nall"), S=tot("snow"), NS=tot("nsnow");
+  const ta=meanK(D,"ta"), nta=meanK(D,"nta");
+  let iceV="…", iceSub="Loading airport reports";
+  if(CL.ice){ if(CL.ice.none) { iceV="–"; iceSub="No airport station nearby"; } else if(CL.ice.err){ iceV="–"; iceSub="Ice reports unavailable"; }
+    else { iceV=`${CL.ice.days} day${CL.ice.days===1?"":"s"}`; iceSub=`${CL.ice.hours} hrs of freezing rain/sleet`;
+      if(CL.iceNorm&&CL.iceNorm.avg) iceSub+=` · 10-yr avg ${CL.iceNorm.days.toFixed(1)} days`; else if(CL.iceNorm&&CL.iceNorm.loading) iceSub+=" · loading 10-yr avg…"; else iceSub+=" · tap for 10-yr avg"; } }
+  el.innerHTML=
+    card("all","Precipitation",`${A.toFixed(2)}″`,`${dep(A,NA,"″")} vs ${NA.toFixed(2)}″ normal · ${pct(A,NA)}${miss("all")>3?` · ${miss("all")} days missing`:""}`,rk(r.all,"wettest","driest"),true)+
+    card("snow","Snow",`${S.toFixed(1)}″`,`${dep(S,NS,"″")} vs ${NS.toFixed(1)}″ normal${miss("snow")>3?` · ${miss("snow")} days missing`:""}`,rk(r.snow,"snowiest","least snowy"),true)+
+    card("temp","Avg temperature",ta!=null?`${ta.toFixed(1)}°`:"–",ta!=null&&nta!=null?`${dep(ta,nta,"°")} vs ${nta.toFixed(1)}° normal`:"",rk(r.temp,"warmest","coldest"),false)+
+    card("ice","Ice",iceV,iceSub,"",true);
+  el.querySelectorAll(".clstat").forEach(b=>b.onclick=()=>{ if(b.disabled) return; CL.type=b.dataset.t; climControls(); climRenderCharts(); climRenderMonths(); if(CL.type==="ice") climIceNormal(); document.getElementById("clCum").scrollIntoView({behavior:"smooth",block:"center"}); });
+}
+function chartBase(){
+  const ink3=cssv("--ink-3"), grid=cssv("--line-soft"), font={family:"Inter, system-ui, sans-serif",size:11};
+  return {responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:"index",intersect:false},
+    plugins:{legend:{display:false},tooltip:{backgroundColor:cssv("--card"),titleColor:cssv("--ink"),bodyColor:cssv("--ink-2"),borderColor:cssv("--line"),borderWidth:1,padding:10,displayColors:true,boxWidth:8,boxHeight:8}},
+    scales:{x:{grid:{display:false},ticks:{color:ink3,font,maxRotation:0,autoSkip:true,maxTicksLimit:7},border:{color:grid}},y:{grid:{color:grid},ticks:{color:ink3,font},border:{display:false},beginAtZero:true}}};
+}
+function climRenderCharts(){
+  if(!CL.data||!document.getElementById("clCum")||typeof Chart==="undefined") return;
+  CL.charts.forEach(c=>c.destroy()); CL.charts=[];
+  const T=CTYPE[CL.type], col=cssv(T.col), ncol=cssv("--ink-3"), base=chartBase(), u=T.unit;
+  const ser=seriesFor(CL.type);
+  const iceWaiting=CL.type==="ice"&&!(CL.iceNorm&&CL.iceNorm.avg);
+  let ca=0,cn=0; const A=[],N=[];
+  ser.forEach(s=>{ ca+=s.a||0; cn+=s.n||0; A.push(s.a==null&&CL.type!=="ice"&&s.d>CL.end?null:+ca.toFixed(2)); N.push(iceWaiting?null:+cn.toFixed(2)); });
+  const normName=CL.type==="ice"?"10-yr average":"Normal";
+  document.getElementById("clCumT").innerHTML=`${T.label}: running total${CL.type==="snow"?" (inches of snow)":CL.type==="ice"?" (hours)":" (inches)"}<span class="lg"><span><span class="sw" style="background:${col}"></span>Actual</span><span><span class="sw" style="background:${ncol}"></span>${normName}${iceWaiting?(CL.iceNorm&&CL.iceNorm.tooLong?" (range too long)":" (loading…)"):""}</span></span>`;
+  const labels=ser.map(s=>fmtD(s.d,daysBetween(CL.start,CL.end)>330));
+  const cum=document.getElementById("clCum"); cum.setAttribute("aria-label",`${T.label} running total compared with ${normName.toLowerCase()}`);
+  CL.charts.push(new Chart(cum,{type:"line",data:{labels,datasets:[
+    {label:"Actual",data:A,borderColor:col,backgroundColor:col,borderWidth:2,pointRadius:0,pointHoverRadius:4,tension:0.1,stepped:false},
+    {label:normName,data:N,borderColor:ncol,backgroundColor:ncol,borderWidth:1.5,borderDash:[5,4],pointRadius:0,pointHoverRadius:4,tension:0.2}
+  ]},options:{...base,plugins:{...base.plugins,tooltip:{...base.plugins.tooltip,callbacks:{label:c=>`${c.dataset.label}: ${c.raw==null?"–":c.raw.toFixed(CL.type==="ice"?0:CL.type==="snow"?1:2)}${u}`}}},scales:{...base.scales,y:{...base.scales.y,ticks:{...base.scales.y.ticks,callback:v=>v+(CL.type==="ice"?"":"″")}}}}}));
+  // monthly bars
+  const ms=monthsOf();
+  const mA=ms.map(m=>CL.type==="ice"?m.ice:+m[CL.type].toFixed(2)), mN=ms.map(m=>CL.type==="ice"?(m.nice==null?null:+m.nice.toFixed(1)):+m["n"+CL.type].toFixed(2));
+  document.getElementById("clMonT").innerHTML=`${T.label} by month<span class="lg"><span><span class="sw" style="background:${col}"></span>Actual</span><span><span class="sw" style="background:${ncol};opacity:.55"></span>${normName}</span></span>`;
+  const mon=document.getElementById("clMon"); mon.setAttribute("aria-label",`${T.label} by month compared with ${normName.toLowerCase()}`);
+  CL.charts.push(new Chart(mon,{type:"bar",data:{labels:ms.map(m=>m.label+(m.partial?"*":"")),datasets:[
+    {label:"Actual",data:mA,backgroundColor:col,borderRadius:{topLeft:4,topRight:4},borderSkipped:"bottom",barPercentage:.85,categoryPercentage:.7},
+    {label:normName,data:mN,backgroundColor:ncol+"88",borderRadius:{topLeft:4,topRight:4},borderSkipped:"bottom",barPercentage:.85,categoryPercentage:.7}
+  ]},options:{...base,onClick:(e,els)=>{ if(els.length) climMonth(els[0].index); },
+    plugins:{...base.plugins,tooltip:{...base.plugins.tooltip,callbacks:{label:c=>`${c.dataset.label}: ${c.raw==null?"–":c.raw}${u}`,footer:()=>"Tap for daily detail"}}},
+    scales:{...base.scales,x:{...base.scales.x,ticks:{...base.scales.x.ticks,maxTicksLimit:13}}}}}));
+  // temperature departures
+  const td=document.getElementById("clTemp");
+  const deps=ms.map(m=>m.dep==null?null:+m.dep.toFixed(1));
+  CL.charts.push(new Chart(td,{type:"bar",data:{labels:ms.map(m=>m.label+(m.partial?"*":"")),datasets:[
+    {label:"Departure",data:deps,backgroundColor:deps.map(v=>v>=0?cssv("--warm"):cssv("--cold")),borderRadius:4,borderSkipped:false,barPercentage:.7}
+  ]},options:{...base,onClick:(e,els)=>{ if(els.length) climMonth(els[0].index); },
+    plugins:{...base.plugins,tooltip:{...base.plugins.tooltip,displayColors:false,callbacks:{label:c=>{ const m=ms[c.dataIndex]; return [`${c.raw>=0?"+":""}${c.raw}° vs normal`,`Avg ${m.ta!=null?m.ta.toFixed(1):"–"}° (normal ${m.nta!=null?m.nta.toFixed(1):"–"}°)`]; }}}},
+    scales:{...base.scales,x:{...base.scales.x,ticks:{...base.scales.x.ticks,maxTicksLimit:13}},y:{...base.scales.y,beginAtZero:false,ticks:{...base.scales.y.ticks,callback:v=>(v>0?"+":"")+v+"°"}}}}}));
+}
+function climRenderMonths(){
+  const el=document.getElementById("clMonths"); if(!el||!CL.data) return;
+  const ms=monthsOf(), t=CL.type;
+  const pc=(a,n,f)=>{ if(!n) return f(a); const p=Math.round(100*a/n); return `${f(a)} <span class="sub">${p}%</span>`; };
+  el.innerHTML=`<table class="cmp"><thead><tr><th>Month</th><th>Avg temp</th><th>Precip</th><th>Snow</th><th>Ice</th></tr></thead><tbody>${ms.map((m,i)=>`
+    <tr class="clrow" data-i="${i}" tabindex="0"><td>${m.label}${m.partial?"*":""}</td><td>${m.ta!=null?m.ta.toFixed(1)+"°":"–"} <span style="color:${m.dep==null?"inherit":m.dep>=0?"var(--warm)":"var(--cold)"};font-weight:600;font-size:12px">${m.dep==null?"":(m.dep>=0?"+":"−")+Math.abs(m.dep).toFixed(1)}</span></td>
+    <td>${pc(m.all,m.nall,v=>v.toFixed(2)+"″")}</td><td>${m.snow>0||m.nsnow>0.05?pc(m.snow,m.nsnow,v=>v.toFixed(1)+"″"):"–"}</td>
+    <td>${m.ice==null?"…":m.ice?`${m.iceDays}d/${m.ice}h`:"–"}</td></tr>`).join("")}</tbody></table>
+    <div class="legend-note" style="margin:6px 10px 10px">% = share of normal. Ice is days/hours with freezing rain or sleet reported. * partial month.</div>`;
+  el.querySelectorAll(".clrow").forEach(r=>{ r.onclick=()=>climMonth(+r.dataset.i); r.onkeydown=e=>{ if(e.key==="Enter") climMonth(+r.dataset.i); }; });
+}
+function climRenderExtremes(){
+  const el=document.getElementById("clExt"); if(!el) return;
+  const D=CL.data, best=(k,f)=>D.filter(r=>r[k]!=null).reduce((a,r)=>!a||f(r[k],a[k])?r:a,null);
+  const hot=best("tx",(a,b)=>a>b), cold=best("tn",(a,b)=>a<b), wet=best("all",(a,b)=>a>b), sn=best("snow",(a,b)=>a>b);
+  let run=0,bestRun=0,runEnd=null; D.forEach(r=>{ if(r.all==null) return; if(r.all<0.01){ run++; if(run>bestRun){ bestRun=run; runEnd=r.d; } } else run=0; });
+  let wrun=0,wbest=0,wend=null; D.forEach(r=>{ if(r.ta==null||r.nta==null) return; if(r.ta>r.nta){ wrun++; if(wrun>wbest){ wbest=wrun; wend=r.d; } } else wrun=0; });
+  let crun=0,cbest=0,cend=null; D.forEach(r=>{ if(r.ta==null||r.nta==null) return; if(r.ta<r.nta){ crun++; if(crun>cbest){ cbest=crun; cend=r.d; } } else crun=0; });
+  const line=(k,v)=>`<p><b>${k}:</b> ${v}</p>`;
+  el.innerHTML=[
+    hot&&line("Hottest day",`${hot.tx}° on ${fmtD(hot.d,true)}${hot.ntx!=null?` (normal high ${Math.round(hot.ntx)}°)`:""}`),
+    cold&&line("Coldest night",`${cold.tn}° on ${fmtD(cold.d,true)}${cold.ntn!=null?` (normal low ${Math.round(cold.ntn)}°)`:""}`),
+    wet&&wet.all>0&&line("Wettest day",`${wet.all.toFixed(2)}″ on ${fmtD(wet.d,true)}`),
+    sn&&sn.snow>0&&line("Biggest snow day",`${sn.snow.toFixed(1)}″ on ${fmtD(sn.d,true)}`),
+    bestRun>1&&line("Longest dry spell",`${bestRun} days, ending ${fmtD(runEnd,true)}`),
+    wbest>2&&line("Longest warm streak",`${wbest} days above normal, ending ${fmtD(wend,true)}`),
+    cbest>2&&line("Longest cold streak",`${cbest} days below normal, ending ${fmtD(cend,true)}`),
+    CL.ice&&CL.ice.byDay&&CL.ice.days?line("Worst ice day",(()=>{ const [d,h]=Object.entries(CL.ice.byDay).sort((a,b)=>b[1]-a[1])[0]; return `${h} hrs of freezing rain/sleet on ${fmtD(d,true)}`; })()):null
+  ].filter(Boolean).join("")||"<p>No data in this range.</p>";
+}
+function climRenderStations(){
+  const el=document.getElementById("clStn"); if(!el) return;
+  const names={temp:"Temperature",precip:"Precipitation",snow:"Snow"};
+  const opt=(g)=>{ const c=CL.chosen[g], list=CL.stations[g]||[];
+    if(!c) return `<p><b>${names[g]}:</b> no station with a long record nearby</p>`;
+    const q=c.q?` · ${Math.round(c.q.obs*100)}% of days reported`:"";
+    return `<p><b>${names[g]}:</b> <select class="clstn" data-g="${g}" aria-label="${names[g]} station">${list.map(s=>`<option value="${s.sid}" ${s.sid===c.sid?"selected":""}>${esc(s.name)} (${s.mi.toFixed(0)} mi)</option>`).join("")}</select><br><span class="sub">${q.slice(3)}</span></p>`; };
+  const a=CL.stations.asos&&CL.stations.asos[0];
+  el.innerHTML=opt("temp")+opt("precip")+opt("snow")+
+    `<p><b>Ice:</b> ${a?`${esc(a.name)} (${a.mi.toFixed(0)} mi) hourly airport reports`:"no airport station nearby"}</p>
+     <p class="sub">Observations and 1991–2020 normals from NOAA (via RCC-ACIS). Ice comes from the IEM airport archive; its "normal" is the same dates over the previous 10 years. Rain is estimated as total precipitation minus the water in the snow (10:1). Rankings compare the same dates in every year of the station's record.</p>`;
+  el.querySelectorAll(".clstn").forEach(s=>s.onchange=()=>{ CL.override[s.dataset.g]=s.value; store("wxClimStn",CL.override); climLoad(); });
+}
+/* ---- month drill-down ---- */
+function climMonth(i){
+  const ms=monthsOf(); if(i<0||i>=ms.length) return;
+  CL.month=i; const m=ms[i];
+  document.getElementById("climBg").hidden=false; document.body.style.overflow="hidden";
+  document.getElementById("clMTitle").textContent=new Date(m.k+"-15T12:00:00Z").toLocaleDateString("en-US",{month:"long",year:"numeric",timeZone:"UTC"});
+  document.getElementById("clPrevM").disabled=i===0; document.getElementById("clNextM").disabled=i===ms.length-1;
+  const pdep=(a,n,u,dg)=>n?`${a.toFixed(dg)}${u} <span class="sub">vs ${n.toFixed(dg)}${u}</span>`:`${a.toFixed(dg)}${u}`;
+  document.getElementById("clMBody").innerHTML=`
+    <div class="stats" style="margin-top:12px">
+      <div class="card stat"><div class="k">Avg temp</div><div class="v">${m.ta!=null?m.ta.toFixed(1)+"°":"–"}</div><div class="r">${m.dep!=null?(m.dep>=0?"+":"−")+Math.abs(m.dep).toFixed(1)+"° vs normal":""}</div></div>
+      <div class="card stat"><div class="k">Precip</div><div class="v" style="font-size:16px">${pdep(m.all,m.nall,"″",2)}</div><div class="r">${m.nall?Math.round(100*m.all/m.nall)+"% of normal":""}</div></div>
+      <div class="card stat"><div class="k">Snow</div><div class="v" style="font-size:16px">${pdep(m.snow,m.nsnow,"″",1)}</div><div class="r">${m.nsnow?Math.round(100*m.snow/Math.max(m.nsnow,0.01))+"% of normal":""}</div></div>
+      <div class="card stat"><div class="k">Ice</div><div class="v" style="font-size:16px">${m.ice==null?"…":`${m.iceDays} days`}</div><div class="r">${m.ice?m.ice+" hrs":""}${m.nice!=null?` · 10-yr avg ${m.nice.toFixed(1)} hrs`:""}</div></div>
+    </div>
+    <div class="card chartbox"><div class="ct">Daily highs and lows (°F)<span class="lg"><span><span class="sw" style="background:var(--warm)"></span>High</span><span><span class="sw" style="background:var(--cold)"></span>Low</span><span><span class="sw" style="background:var(--line)"></span>Normal range</span></span></div><div class="canvas-wrap"><canvas id="clMT" role="img" aria-label="Daily high and low temperatures against the normal range"></canvas></div></div>
+    <div class="card chartbox"><div class="ct">Daily precipitation (inches of water)<span class="lg"><span><span class="sw" style="background:var(--rain)"></span>Rain</span><span><span class="sw" style="background:var(--snow)"></span>Snow (water)</span></span></div><div class="canvas-wrap" style="height:150px"><canvas id="clMP" role="img" aria-label="Daily precipitation split into rain and snow water"></canvas></div></div>
+    <div class="card tablewrap"><table class="cmp"><thead><tr><th>Day</th><th>High</th><th>Low</th><th>Normal</th><th>Precip</th><th>Snow</th><th>Ice</th></tr></thead><tbody>
+    ${m.rows.map(r=>{ const ih=iceOf(r.d); return `<tr><td>${fmtD(r.d)}</td><td>${r.tx??"–"}${r.tx!=null&&r.ntx!=null?`<span class="sub" style="color:${r.tx>=r.ntx?"var(--warm)":"var(--cold)"}"> ${r.tx>=r.ntx?"+":"−"}${Math.abs(Math.round(r.tx-r.ntx))}</span>`:""}</td><td>${r.tn??"–"}</td><td class="sub">${r.ntx!=null?Math.round(r.ntx)+"/"+Math.round(r.ntn):"–"}</td><td>${r.all==null?"M":r.all>0?r.all.toFixed(2):"0"}</td><td>${r.snow==null?"–":r.snow>0?r.snow.toFixed(1):"0"}</td><td>${ih?ih+"h":"–"}</td></tr>`; }).join("")}
+    </tbody></table></div>`;
+  CL.mcharts.forEach(c=>c.destroy()); CL.mcharts=[];
+  if(typeof Chart==="undefined") return;
+  const base=chartBase(), labels=m.rows.map(r=>+r.d.slice(8));
+  const band=cssv("--line");
+  CL.mcharts.push(new Chart(document.getElementById("clMT"),{type:"line",data:{labels,datasets:[
+    {label:"Normal low",data:m.rows.map(r=>r.ntn),borderWidth:0,pointRadius:0,fill:false,order:10},
+    {label:"Normal high",data:m.rows.map(r=>r.ntx),borderWidth:0,pointRadius:0,fill:"-1",backgroundColor:band+"aa",order:10},
+    {label:"High",data:m.rows.map(r=>r.tx),borderColor:cssv("--warm"),backgroundColor:cssv("--warm"),borderWidth:2,pointRadius:2,tension:0.25,order:1},
+    {label:"Low",data:m.rows.map(r=>r.tn),borderColor:cssv("--cold"),backgroundColor:cssv("--cold"),borderWidth:2,pointRadius:2,tension:0.25,order:1}
+  ]},options:{...base,plugins:{...base.plugins,tooltip:{...base.plugins.tooltip,filter:i=>i.datasetIndex>=2,callbacks:{title:c=>fmtD(m.rows[c[0].dataIndex].d,true),label:c=>{ const r=m.rows[c.dataIndex]; return c.datasetIndex===2?`High ${r.tx??"–"}° (normal ${r.ntx!=null?Math.round(r.ntx):"–"}°)`:`Low ${r.tn??"–"}° (normal ${r.ntn!=null?Math.round(r.ntn):"–"}°)`; }}}},
+    scales:{...base.scales,y:{...base.scales.y,beginAtZero:false,ticks:{...base.scales.y.ticks,callback:v=>v+"°"}}}}}));
+  const sw=m.rows.map(r=>r.snow!=null&&r.all!=null?Math.min(r.all,r.snow/10):0), rn=m.rows.map((r,i)=>r.all==null?null:Math.max(0,r.all-sw[i]));
+  CL.mcharts.push(new Chart(document.getElementById("clMP"),{type:"bar",data:{labels,datasets:[
+    {label:"Rain",data:rn,backgroundColor:cssv("--rain"),stack:"p",borderRadius:2,barPercentage:.8},
+    {label:"Snow (water)",data:sw,backgroundColor:cssv("--snow"),stack:"p",borderRadius:2,barPercentage:.8}
+  ]},options:{...base,plugins:{...base.plugins,tooltip:{...base.plugins.tooltip,callbacks:{title:c=>fmtD(m.rows[c[0].dataIndex].d,true),label:c=>`${c.dataset.label}: ${c.raw==null?"M":c.raw.toFixed(2)}″`,footer:c=>{ const r=m.rows[c[0].dataIndex]; return r.snow>0?`Snowfall ${r.snow.toFixed(1)}″`:""; }}}},
+    scales:{...base.scales,x:{...base.scales.x,stacked:true},y:{...base.scales.y,stacked:true,ticks:{...base.scales.y.ticks,callback:v=>v+"″"}}}}}));
+  document.querySelector("#climBg .sheet").scrollTop=0;
+}
+function climCloseMonth(){ document.getElementById("climBg").hidden=true; document.body.style.overflow=""; CL.mcharts.forEach(c=>c.destroy()); CL.mcharts=[]; }
+
 /* ---------- wiring ---------- */
 function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 document.querySelectorAll("nav.tabs button").forEach(b=>b.onclick=()=>{
@@ -1063,6 +1505,7 @@ document.querySelectorAll("nav.tabs button").forEach(b=>b.onclick=()=>{
   document.querySelectorAll(".view").forEach(v=>v.hidden=v.id!=="view-"+b.dataset.tab);
   if(b.dataset.tab==="radar") setTimeout(initRadar,30); else if(map) pause();
   if(b.dataset.tab==="pressure") setTimeout(initPressure,30); else { jetStop(); pPause(); }
+  if(b.dataset.tab==="climate") initClimate();
 });
 document.getElementById("playBtn").onclick=()=>playing?pause():play();
 document.getElementById("frameSlider").oninput=e=>{pause();showFrame(+e.target.value);};
@@ -1099,6 +1542,7 @@ function setLocation(loc, persist=true){
   PLACE.tz=TZ; makeKeyFmt(); showPlace();
   if(persist) saveLoc();
   if(map){ map.setView([LAT,LON],8); marker.setLatLng([LAT,LON]); }
+  if(typeof CL!=="undefined"){ CL.data=null; CL.override={}; if(!document.getElementById("view-climate").hidden) initClimate(); }
   if(typeof P!=="undefined"&&P.home){ P.home.setLatLng([LAT,LON]); if(P.sel) pDrawTrack(); }
   if(openIdx!==null) closeSheet();
   document.getElementById("days").innerHTML='<div class="loading"><span class="spin"></span>Pulling forecasts…</div>';

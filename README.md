@@ -14,3 +14,7 @@ To keep the topic private, add a repo secret named `NTFY_TOPIC`; it overrides th
 ## Pressure map
 
 `.github/workflows/synoptic.yml` runs `scripts/synoptic.mjs` every 6 hours. It pulls GFS sea-level pressure, 6-hour precipitation and 250 mb winds on a 2.5° grid from the central Pacific to the western Atlantic (~900 points, 10 days, 6-hourly). It then detects highs and lows, links them into tracks, and force-pushes `synoptic.json` to the `data` branch. The app's Pressure tab reads it from raw.githubusercontent.com.
+
+## Climate tab
+
+Observed precipitation, snow and temperature vs. 1991–2020 normals from NOAA stations via RCC-ACIS (called from the browser). For each measurement the app uses the nearest station with a long, complete record and normals. Rankings compare the same dates in every year of that station's record. Ice (freezing rain/sleet days and hours) comes from the nearest airport's hourly reports in the IEM ASOS archive, compared with the same dates over the previous 10 years.
