@@ -200,7 +200,17 @@ a{color:var(--accent)}
 .hbtns .refresh{white-space:nowrap}
 .installtip{padding:10px 12px;margin-bottom:12px;font-size:13.5px;display:flex;gap:10px;align-items:flex-start}
 .installtip img{width:36px;height:36px;border-radius:8px;flex:none}
-.installtip .x{margin-left:auto;border:0;background:transparent;color:var(--ink-3);font-size:16px;cursor:pointer;padding:0 2px}
+.installtip .x{margin:-8px -8px -8px auto;border:0;background:transparent;color:var(--ink-3);font-size:18px;cursor:pointer;width:44px;height:44px;flex:none;display:grid;place-items:center;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal-bg[hidden]{display:none}
+.modal{background:var(--card);border-radius:16px;max-width:360px;width:100%;padding:20px;box-shadow:0 10px 40px rgba(0,0,0,.25);text-align:center}
+.modal img{width:64px;height:64px;border-radius:14px}
+.modal h2{font-size:18px;margin:10px 0 6px}
+.modal p{color:var(--ink-2);font-size:14px;margin:0 0 14px}
+.modal ol{text-align:left;color:var(--ink-2);font-size:14px;margin:0 0 14px;padding-left:22px;line-height:1.6}
+.modal .mbtns{display:grid;gap:8px}
+.modal .mbtns button{font:inherit;font-weight:600;font-size:15px;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.modal .mbtns button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
 </style>
 </head>
@@ -321,6 +331,10 @@ footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
   </div>
 </div>
 
+<div class="modal-bg" id="tipModal" hidden role="dialog" aria-modal="true" aria-labelledby="tipTitle">
+  <div class="modal" id="tipModalBody"></div>
+</div>
+
 <div class="sheet-bg" id="climBg" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="clMTitle">
     <div class="sheet-head">
@@ -349,7 +363,7 @@ footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
 <script>
 "use strict";
 /* ---------- self-update: home-screen apps can keep a stale copy, so check for a newer build on open ---------- */
-const BUILD="202611091654";
+const BUILD="202611091704";
 async function checkForUpdate(){
   try{
     const r=await fetch(location.pathname+"?check="+Date.now(),{cache:"no-store"});
@@ -1542,32 +1556,55 @@ function climCloseMonth(){ document.getElementById("climBg").hidden=true; docume
 
 /* ---------- share + install ---------- */
 const APP_HOME=location.origin+location.pathname;
+const SHARE_URL=APP_HOME+"?s=1";
 const SHARE_TEXT="Blendcast: one weather forecast blended from the National Weather Service and six weather models, with radar, pressure maps and climate stats.";
 document.getElementById("shareBtn").onclick=async()=>{
   if(navigator.share){
-    try{ await navigator.share({title:"Blendcast",text:SHARE_TEXT,url:APP_HOME}); }catch(e){}
+    try{ await navigator.share({title:"Blendcast",text:SHARE_TEXT,url:SHARE_URL}); }catch(e){}
     return;
   }
-  const body=`${SHARE_TEXT}\n\nBlendcast: ${APP_HOME}\n\nOn iPhone: open the link in Safari, tap Share, then "Add to Home Screen".`;
+  const body=`${SHARE_TEXT}\n\nBlendcast: ${SHARE_URL}\n\nOn iPhone: open the link in Safari, tap Share, then "Add to Home Screen".`;
   location.href=`mailto:?subject=${encodeURIComponent("Check out Blendcast")}&body=${encodeURIComponent(body)}`;
 };
 (function installTip(){
-  const el=document.getElementById("installTip");
+  const el=document.getElementById("installTip"), modal=document.getElementById("tipModal"), mb=document.getElementById("tipModalBody");
   const standalone=window.navigator.standalone===true||matchMedia("(display-mode: standalone)").matches;
+  const q=new URLSearchParams(location.search), fromShare=q.get("s")==="1";
+  if(fromShare){ try{ localStorage.removeItem("wxTipDone"); }catch(e){} }   // arriving from a shared link brings the tip back
   let dismissed=false; try{ dismissed=localStorage.getItem("wxTipDone")==="1"; }catch(e){}
   if(standalone||dismissed) return;
-  const close=()=>{ el.hidden=true; try{ localStorage.setItem("wxTipDone","1"); }catch(e){} };
   const ios=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
-  if(ios){
-    const safari=/Safari/.test(navigator.userAgent)&&!/CriOS|FxiOS|EdgiOS|GSA|OPiOS/.test(navigator.userAgent);
-    el.innerHTML=`<img src="apple-touch-icon.png" alt=""><div><b>Add Blendcast to your Home Screen</b><br>${safari?"Tap the Share button <b>⬆︎</b> in Safari's toolbar, then <b>Add to Home Screen</b>.":"Open this page in <b>Safari</b>, tap Share <b>⬆︎</b>, then <b>Add to Home Screen</b>."}</div><button class="x" aria-label="Dismiss">✕</button>`;
-    el.hidden=false; el.querySelector(".x").onclick=close;
-  }
+  const safari=/Safari/.test(navigator.userAgent)&&!/CriOS|FxiOS|EdgiOS|GSA|OPiOS/.test(navigator.userAgent);
+  let deferred=null;
+  const done=()=>{ el.hidden=true; modal.hidden=true; try{ localStorage.setItem("wxTipDone","1"); }catch(e){} };
+  const steps=ios?(safari?`<ol><li>Tap the <b>Share</b> button <b>⬆︎</b> in Safari's toolbar</li><li>Scroll down and tap <b>Add to Home Screen</b></li><li>Tap <b>Add</b></li></ol>`
+                         :`<ol><li>Open this page in <b>Safari</b></li><li>Tap <b>Share ⬆︎</b>, then <b>Add to Home Screen</b></li><li>Tap <b>Add</b></li></ol>`)
+                 :`<ol><li>Open your browser's menu <b>⋮</b></li><li>Tap <b>Install app</b> or <b>Add to Home screen</b></li></ol>`;
+  const askModal=()=>{
+    mb.innerHTML=`<img src="apple-touch-icon.png" alt=""><h2 id="tipTitle">Have you added Blendcast to your Home Screen?</h2><p>It opens full-screen like an app and remembers your location.</p>
+      <div class="mbtns"><button class="primary" id="tmYes">Yes, it's on my Home Screen</button><button id="tmHow">Not yet, show me how</button><button id="tmNo">No thanks, don't show again</button></div>`;
+    modal.hidden=false;
+    document.getElementById("tmYes").onclick=done;
+    document.getElementById("tmNo").onclick=done;
+    document.getElementById("tmHow").onclick=()=>{
+      mb.innerHTML=`<img src="apple-touch-icon.png" alt=""><h2 id="tipTitle">Add Blendcast to your Home Screen</h2>${steps}
+        <div class="mbtns">${deferred?'<button class="primary" id="tmInstall">Install now</button>':""}<button class="${deferred?"":"primary"}" id="tmOk">Got it</button><button id="tmNo2">Don't show again</button></div>`;
+      document.getElementById("tmOk").onclick=()=>{ modal.hidden=true; };
+      document.getElementById("tmNo2").onclick=done;
+      const ib=document.getElementById("tmInstall"); if(ib) ib.onclick=async()=>{ deferred.prompt(); try{ await deferred.userChoice; }catch(_){} done(); };
+    };
+  };
+  modal.addEventListener("click",e=>{ if(e.target===modal) modal.hidden=true; });
+  const show=(title,body)=>{
+    el.innerHTML=`<img src="apple-touch-icon.png" alt=""><div><b>${title}</b><br>${body}</div><button type="button" class="x" aria-label="Close">✕</button>`;
+    el.hidden=false;
+    el.querySelector(".x").addEventListener("click",e=>{ e.preventDefault(); e.stopPropagation(); askModal(); });
+  };
+  if(ios) show("Add Blendcast to your Home Screen", safari?"Tap the Share button <b>⬆︎</b> in Safari's toolbar, then <b>Add to Home Screen</b>.":"Open this page in <b>Safari</b>, tap Share <b>⬆︎</b>, then <b>Add to Home Screen</b>.");
   window.addEventListener("beforeinstallprompt",e=>{
-    e.preventDefault();
-    el.innerHTML=`<img src="icon-192.png" alt=""><div><b>Install Blendcast</b><br>Add it to your home screen like an app.<br><button class="refresh" id="installBtn" style="margin-top:8px">Install</button></div><button class="x" aria-label="Dismiss">✕</button>`;
-    el.hidden=false; el.querySelector(".x").onclick=close;
-    document.getElementById("installBtn").onclick=async()=>{ e.prompt(); try{ await e.userChoice; }catch(_){} close(); };
+    e.preventDefault(); deferred=e;
+    show("Install Blendcast",'Add it to your home screen like an app.<br><button class="refresh" id="installBtn" style="margin-top:8px">Install</button>');
+    document.getElementById("installBtn").onclick=async()=>{ e.prompt(); try{ await e.userChoice; }catch(_){} done(); };
   });
 })();
 
@@ -1721,7 +1758,7 @@ document.getElementById("geoBtn").onclick=()=>{
 (function start(){
   const link=linkLoc(), saved=load("wxLoc");
   // keep the address clean so a home-screen icon added later always opens the saved default
-  if(link){ try{ history.replaceState(null,"",location.pathname); }catch(e){} }
+  if(link||location.search){ try{ history.replaceState(null,"",location.pathname); }catch(e){} }
   if(link&&saved){ setLocation(link,false); showLinkBanner(saved); }   // existing user: view only
   else if(link) setLocation(link,true);                                // new user: the link becomes their default
   else if(saved) setLocation(saved,false);
