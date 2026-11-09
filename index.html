@@ -10,7 +10,20 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<link rel="icon" type="image/png" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="description" content="One weather forecast blended from the National Weather Service and six weather models, with radar, pressure maps and climate stats.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Blendcast">
+<meta property="og:title" content="Blendcast">
+<meta property="og:description" content="One weather forecast blended from the National Weather Service and six weather models.">
+<meta property="og:url" content="https://richwilmot323-tech.github.io/sudbury-weather/">
+<meta property="og:image" content="https://richwilmot323-tech.github.io/sudbury-weather/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Blendcast">
+<meta name="twitter:image" content="https://richwilmot323-tech.github.io/sudbury-weather/og.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
@@ -183,6 +196,11 @@ a{color:var(--accent)}
 .linkbanner{padding:10px 12px;margin-bottom:12px;font-size:13.5px}
 .lbbtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .brand{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:2px}
+.hbtns{display:flex;gap:6px}
+.hbtns .refresh{white-space:nowrap}
+.installtip{padding:10px 12px;margin-bottom:12px;font-size:13.5px;display:flex;gap:10px;align-items:flex-start}
+.installtip img{width:36px;height:36px;border-radius:8px;flex:none}
+.installtip .x{margin-left:auto;border:0;background:transparent;color:var(--ink-3);font-size:16px;cursor:pointer;padding:0 2px}
 footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
 </style>
 </head>
@@ -194,9 +212,13 @@ footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
       <button class="placebtn" id="placeBtn" aria-label="Change location"><span class="place" id="placeName">Weather</span><span class="chev">Change ▾</span></button>
       <div class="sub" id="updated">Loading forecasts…</div>
     </div>
-    <button class="refresh" id="refreshBtn" aria-label="Refresh forecasts">↻ Refresh</button>
+    <div class="hbtns">
+      <button class="refresh" id="shareBtn" aria-label="Share Blendcast">⤴ Share</button>
+      <button class="refresh" id="refreshBtn" aria-label="Refresh forecasts">↻</button>
+    </div>
   </header>
 
+  <div class="card installtip" id="installTip" hidden></div>
   <div class="card linkbanner" id="linkBanner" hidden></div>
   <div id="alerts"></div>
   <div id="nowCard"></div>
@@ -327,7 +349,7 @@ footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
 <script>
 "use strict";
 /* ---------- self-update: home-screen apps can keep a stale copy, so check for a newer build on open ---------- */
-const BUILD="202611091640";
+const BUILD="202611091654";
 async function checkForUpdate(){
   try{
     const r=await fetch(location.pathname+"?check="+Date.now(),{cache:"no-store"});
@@ -1517,6 +1539,37 @@ function climMonth(i){
   document.querySelector("#climBg .sheet").scrollTop=0;
 }
 function climCloseMonth(){ document.getElementById("climBg").hidden=true; document.body.style.overflow=""; CL.mcharts.forEach(c=>c.destroy()); CL.mcharts=[]; }
+
+/* ---------- share + install ---------- */
+const APP_HOME=location.origin+location.pathname;
+const SHARE_TEXT="Blendcast: one weather forecast blended from the National Weather Service and six weather models, with radar, pressure maps and climate stats.";
+document.getElementById("shareBtn").onclick=async()=>{
+  if(navigator.share){
+    try{ await navigator.share({title:"Blendcast",text:SHARE_TEXT,url:APP_HOME}); }catch(e){}
+    return;
+  }
+  const body=`${SHARE_TEXT}\n\nBlendcast: ${APP_HOME}\n\nOn iPhone: open the link in Safari, tap Share, then "Add to Home Screen".`;
+  location.href=`mailto:?subject=${encodeURIComponent("Check out Blendcast")}&body=${encodeURIComponent(body)}`;
+};
+(function installTip(){
+  const el=document.getElementById("installTip");
+  const standalone=window.navigator.standalone===true||matchMedia("(display-mode: standalone)").matches;
+  let dismissed=false; try{ dismissed=localStorage.getItem("wxTipDone")==="1"; }catch(e){}
+  if(standalone||dismissed) return;
+  const close=()=>{ el.hidden=true; try{ localStorage.setItem("wxTipDone","1"); }catch(e){} };
+  const ios=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+  if(ios){
+    const safari=/Safari/.test(navigator.userAgent)&&!/CriOS|FxiOS|EdgiOS|GSA|OPiOS/.test(navigator.userAgent);
+    el.innerHTML=`<img src="apple-touch-icon.png" alt=""><div><b>Add Blendcast to your Home Screen</b><br>${safari?"Tap the Share button <b>⬆︎</b> in Safari's toolbar, then <b>Add to Home Screen</b>.":"Open this page in <b>Safari</b>, tap Share <b>⬆︎</b>, then <b>Add to Home Screen</b>."}</div><button class="x" aria-label="Dismiss">✕</button>`;
+    el.hidden=false; el.querySelector(".x").onclick=close;
+  }
+  window.addEventListener("beforeinstallprompt",e=>{
+    e.preventDefault();
+    el.innerHTML=`<img src="icon-192.png" alt=""><div><b>Install Blendcast</b><br>Add it to your home screen like an app.<br><button class="refresh" id="installBtn" style="margin-top:8px">Install</button></div><button class="x" aria-label="Dismiss">✕</button>`;
+    el.hidden=false; el.querySelector(".x").onclick=close;
+    document.getElementById("installBtn").onclick=async()=>{ e.prompt(); try{ await e.userChoice; }catch(_){} close(); };
+  });
+})();
 
 /* ---------- wiring ---------- */
 function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
