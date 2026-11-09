@@ -324,6 +324,21 @@ footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 "use strict";
+/* ---------- self-update: home-screen apps can keep a stale copy, so check for a newer build on open ---------- */
+const BUILD="202611091637";
+async function checkForUpdate(){
+  try{
+    const r=await fetch(location.pathname+"?check="+Date.now(),{cache:"no-store"});
+    if(!r.ok) return;
+    const m=/const BUILD="([^"]+)"/.exec(await r.text());
+    if(m&&m[1]!==BUILD&&m[1]!=="__BUILD__"&&sessionStorage.getItem("wxUpd")!==m[1]){
+      sessionStorage.setItem("wxUpd",m[1]);
+      location.replace(location.pathname+"?v="+encodeURIComponent(m[1]));
+    }
+  }catch(e){}
+}
+checkForUpdate();
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") checkForUpdate(); });
 /* ---------- config ---------- */
 const DEFAULT_LOC = {name:"Sudbury, MA", lat:42.3834, lon:-71.4162, tz:"America/New_York"};
 let LAT, LON, TZ, PLACE;
