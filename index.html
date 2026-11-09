@@ -180,6 +180,8 @@ a{color:var(--accent)}
 .clstat .rk{font-size:11.5px;font-weight:600;color:var(--accent);margin-top:3px}
 .clrow{cursor:pointer}.clrow:hover td{background:var(--line-soft)}
 .clstn{font:inherit;font-size:13px;padding:4px 6px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);max-width:100%}
+.linkbanner{padding:10px 12px;margin-bottom:12px;font-size:13.5px}
+.lbbtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
 </style>
 </head>
@@ -187,12 +189,13 @@ footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
 <div class="wrap">
   <header class="top">
     <div>
-      <button class="placebtn" id="placeBtn" aria-label="Change location"><span class="place" id="placeName">Sudbury, MA</span><span class="chev">Change ▾</span></button>
+      <button class="placebtn" id="placeBtn" aria-label="Change location"><span class="place" id="placeName">Weather</span><span class="chev">Change ▾</span></button>
       <div class="sub" id="updated">Loading forecasts…</div>
     </div>
     <button class="refresh" id="refreshBtn" aria-label="Refresh forecasts">↻ Refresh</button>
   </header>
 
+  <div class="card linkbanner" id="linkBanner" hidden></div>
   <div id="alerts"></div>
   <div id="nowCard"></div>
 
@@ -1529,7 +1532,6 @@ function saveLoc(){
   store("wxLoc",PLACE);
   const rec=(load("wxRecent")||[]).filter(r=>Math.abs(r.lat-PLACE.lat)>0.01||Math.abs(r.lon-PLACE.lon)>0.01);
   rec.unshift({name:PLACE.name,lat:PLACE.lat,lon:PLACE.lon,tz:PLACE.tz}); store("wxRecent",rec.slice(0,6));
-  try{ history.replaceState(null,"",shareLink()); }catch(e){}
 }
 function showPlace(){
   document.getElementById("placeName").textContent=PLACE.name;
@@ -1540,7 +1542,7 @@ function setLocation(loc, persist=true){
   PLACE={...loc}; LAT=+loc.lat; LON=+loc.lon;
   try{ new Intl.DateTimeFormat("en-US",{timeZone:loc.tz}); TZ=loc.tz; }catch(e){ TZ=Intl.DateTimeFormat().resolvedOptions().timeZone; }
   PLACE.tz=TZ; makeKeyFmt(); showPlace();
-  if(persist) saveLoc();
+  if(persist){ saveLoc(); const lb=document.getElementById("linkBanner"); if(lb) lb.hidden=true; }
   if(map){ map.setView([LAT,LON],8); marker.setLatLng([LAT,LON]); }
   if(typeof CL!=="undefined"){ CL.data=null; CL.override={}; if(!document.getElementById("view-climate").hidden) initClimate(); }
   if(typeof P!=="undefined"&&P.home){ P.home.setLatLng([LAT,LON]); if(P.sel) pDrawTrack(); }
@@ -1550,21 +1552,46 @@ function setLocation(loc, persist=true){
   STATE=null;
   loadAll().catch(fail);
 }
-function initialLoc(){
+function linkLoc(){
   const q=new URLSearchParams(location.search);
   if(q.get("lat")&&q.get("lon")&&isFinite(+q.get("lat"))&&isFinite(+q.get("lon")))
     return {name:q.get("name")||"Selected location",lat:+q.get("lat"),lon:+q.get("lon"),tz:q.get("tz")||Intl.DateTimeFormat().resolvedOptions().timeZone};
-  return load("wxLoc")||DEFAULT_LOC;
+  return null;
 }
+const sameLoc=(a,b)=>a&&b&&Math.abs(a.lat-b.lat)<0.01&&Math.abs(a.lon-b.lon)<0.01;
+function showLinkBanner(home){
+  const el=document.getElementById("linkBanner");
+  if(!home||sameLoc(home,PLACE)){ el.hidden=true; return; }
+  el.hidden=false;
+  el.innerHTML=`Showing <b>${esc(PLACE.name)}</b> from a shared link. <span class="lbbtns"><button class="refresh" id="lbMake">Make this my default</button><button class="refresh" id="lbHome">Back to ${esc(home.name.split(",")[0])}</button></span>`;
+  document.getElementById("lbMake").onclick=()=>{ saveLoc(); el.hidden=true; };
+  document.getElementById("lbHome").onclick=()=>{ el.hidden=true; setLocation(home,false); };
+}
+// First visit with no saved place: ask the device for its location, then fall back to search.
+function firstVisit(){
+  document.getElementById("placeName").textContent="Finding your location…";
+  document.getElementById("days").innerHTML='<div class="loading"><span class="spin"></span>Finding your location…</div>';
+  const fallback=()=>{ CL_FIRST=true; openLoc(); document.getElementById("locTitle").textContent="Where are you?"; };
+  if(!navigator.geolocation) return fallback();
+  navigator.geolocation.getCurrentPosition(pos=>{
+    setLocation({name:"Current location",lat:+pos.coords.latitude.toFixed(4),lon:+pos.coords.longitude.toFixed(4),tz:Intl.DateTimeFormat().resolvedOptions().timeZone,fromGeo:true});
+  },fallback,{enableHighAccuracy:false,timeout:12000,maximumAge:600000});
+}
+let CL_FIRST=false;
 // search UI
 let searchTimer=null, searchSeq=0;
 function openLoc(){
   document.getElementById("locBg").hidden=false; document.body.style.overflow="hidden";
-  document.getElementById("shareUrl").value=shareLink();
+  document.getElementById("shareUrl").value=PLACE?shareLink():"";
+  document.querySelector(".sharebox").hidden=!PLACE;
   document.getElementById("locInput").value=""; renderRecent();
   setTimeout(()=>document.getElementById("locInput").focus(),50);
 }
-function closeLoc(){ document.getElementById("locBg").hidden=true; document.body.style.overflow=""; }
+function closeLoc(){
+  document.getElementById("locBg").hidden=true; document.body.style.overflow="";
+  document.getElementById("locTitle").textContent="Choose location";
+  if(!PLACE) setLocation(DEFAULT_LOC,false); // closed the first-visit picker without choosing: show the default for now, ask again next time
+}
 function locItem(label,sub,loc,removable){
   const b=document.createElement("button"); b.className="loc-item";
   b.innerHTML=`<span><span class="ln">${esc(label)}</span><br><span class="ls">${esc(sub)}</span></span>${removable?'<span class="x" aria-label="Remove">✕</span>':""}`;
@@ -1621,9 +1648,16 @@ document.getElementById("geoBtn").onclick=()=>{
   },err=>{ b.textContent= err.code===1 ? "📍 Location permission denied. Allow it in Settings, or search instead" : "📍 Couldn't get your location. Try searching"; },{enableHighAccuracy:false,timeout:10000,maximumAge:600000});
 };
 
-setLocation(initialLoc(), false);
-if(new URLSearchParams(location.search).get("lat")) saveLoc();
-setInterval(()=>{ if(document.visibilityState==="visible") loadAll().catch(()=>{}); }, 30*60*1000);
+(function start(){
+  const link=linkLoc(), saved=load("wxLoc");
+  // keep the address clean so a home-screen icon added later always opens the saved default
+  if(link){ try{ history.replaceState(null,"",location.pathname); }catch(e){} }
+  if(link&&saved){ setLocation(link,false); showLinkBanner(saved); }   // existing user: view only
+  else if(link) setLocation(link,true);                                // new user: the link becomes their default
+  else if(saved) setLocation(saved,false);
+  else firstVisit();
+})();
+setInterval(()=>{ if(PLACE&&document.visibilityState==="visible") loadAll().catch(()=>{}); }, 30*60*1000);
 </script>
 </body>
 </html>
