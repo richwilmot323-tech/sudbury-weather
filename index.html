@@ -51,6 +51,7 @@
   }
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased}
 button{font:inherit;color:inherit}
 .wrap{max-width:780px;margin:0 auto;padding:14px 14px 60px}
@@ -363,7 +364,7 @@ footer{color:var(--ink-3);font-size:11.5px;text-align:center;margin-top:20px}
 <script>
 "use strict";
 /* ---------- self-update: home-screen apps can keep a stale copy, so check for a newer build on open ---------- */
-const BUILD="202611091704";
+const BUILD="202611091708";
 async function checkForUpdate(){
   try{
     const r=await fetch(location.pathname+"?check="+Date.now(),{cache:"no-store"});
@@ -1572,7 +1573,8 @@ document.getElementById("shareBtn").onclick=async()=>{
   const q=new URLSearchParams(location.search), fromShare=q.get("s")==="1";
   if(fromShare){ try{ localStorage.removeItem("wxTipDone"); }catch(e){} }   // arriving from a shared link brings the tip back
   let dismissed=false; try{ dismissed=localStorage.getItem("wxTipDone")==="1"; }catch(e){}
-  if(standalone||dismissed) return;
+  let later=false; try{ later=sessionStorage.getItem("wxTipLater")==="1"; }catch(e){}
+  if(standalone||dismissed||(later&&!fromShare)) return;
   const ios=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
   const safari=/Safari/.test(navigator.userAgent)&&!/CriOS|FxiOS|EdgiOS|GSA|OPiOS/.test(navigator.userAgent);
   let deferred=null;
@@ -1589,7 +1591,7 @@ document.getElementById("shareBtn").onclick=async()=>{
     document.getElementById("tmHow").onclick=()=>{
       mb.innerHTML=`<img src="apple-touch-icon.png" alt=""><h2 id="tipTitle">Add Blendcast to your Home Screen</h2>${steps}
         <div class="mbtns">${deferred?'<button class="primary" id="tmInstall">Install now</button>':""}<button class="${deferred?"":"primary"}" id="tmOk">Got it</button><button id="tmNo2">Don't show again</button></div>`;
-      document.getElementById("tmOk").onclick=()=>{ modal.hidden=true; };
+      document.getElementById("tmOk").onclick=()=>{ modal.hidden=true; el.hidden=true; try{ sessionStorage.setItem("wxTipLater","1"); }catch(e){} };
       document.getElementById("tmNo2").onclick=done;
       const ib=document.getElementById("tmInstall"); if(ib) ib.onclick=async()=>{ deferred.prompt(); try{ await deferred.userChoice; }catch(_){} done(); };
     };
