@@ -109,6 +109,7 @@ function activeAlerts() {
   const f = (W.STATE.alerts && W.STATE.alerts.features) || [];
   return f.filter(a => a.properties && (!a.properties.status || a.properties.status === "Actual"));
 }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function send({ title, message, tags = [], priority = 3 }) {
   const body = {
     topic: env.NTFY_TOPIC, title, message, tags, priority, click: APP_URL,
@@ -116,16 +117,38 @@ async function send({ title, message, tags = [], priority = 3 }) {
   };
   if (DRY) { console.log("\n=== WOULD SEND ===\n" + JSON.stringify({ title, message, tags, priority }, null, 2)); return; }
   if (!env.NTFY_TOPIC) throw new Error("NTFY_TOPIC not set");
-  const r = await fetch(env.NTFY_SERVER || "https://ntfy.sh", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!r.ok) throw new Error(`ntfy HTTP ${r.status}: ${await r.text()}`);
-  console.log("sent:", title);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const r = await fetch(env.NTFY_SERVER || "https://ntfy.sh", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(30000) });
+      if (!r.ok) throw new Error(`ntfy HTTP ${r.status}: ${await r.text()}`);
+      console.log("sent:", title); return;
+    } catch (e) {
+      if (attempt >= 4) throw e;
+      console.warn(`ntfy send failed (attempt ${attempt}): ${e.message}; retrying`); await sleep(15000 * attempt);
+    }
+  }
 }
 
 /* ---------- main ---------- */
 W.setLoc(LOC);
-await W.loadAll();
+// Weather services occasionally blip; retry the whole load a few times before giving up.
+for (let attempt = 1; attempt <= 3; attempt++) {
+  try { await W.loadAll(); } catch (e) { console.warn(`load attempt ${attempt} threw: ${e.message}`); }
+  const st = W.STATE;
+  const ok = st && st.daily && st.daily[0] && st.daily[0].nSrc && st.sources.length >= 2;
+  if (ok) break;
+  console.warn(`forecast load attempt ${attempt} incomplete${st ? ` (${st.sources.length} sources)` : ""}`);
+  if (attempt < 3) await sleep(30000);
+}
 const S = W.STATE;
-if (!S || !S.daily || !S.daily[0] || !S.daily[0].nSrc) throw new Error("No forecast data loaded");
+if (!S || !S.daily || !S.daily[0] || !S.daily[0].nSrc) {
+  // Only fail loudly (which emails you) if the morning message is at risk; otherwise skip quietly and try next hour.
+  const hourNow = +W.localKey(new Date()).slice(11, 13);
+  const st = loadState(), day = W.localKey(new Date()).slice(0, 10);
+  const morningMissing = !(st.days && st.days[day] && st.days[day].morningSent);
+  if (MODE !== "test" && !(morningMissing && hourNow >= 10)) { console.warn("No forecast data this hour; skipping quietly, will retry next run."); process.exit(0); }
+  throw new Error("No forecast data loaded");
+}
 console.log("sources:", S.status.map(s => `${s.name}:${s.ok ? "ok" : "FAIL"}`).join(", "));
 
 const nowKey = W.localKey(new Date());
